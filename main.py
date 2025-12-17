@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app.api import auth
 import uvicorn
 
 app = FastAPI(
@@ -18,8 +19,10 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+app.include_router(auth.router)
+
 @app.get("/")
-def read_root():
+def root():
     return {
         "message": f"Server of {settings.app_name} is working!",
         "status": "active",
@@ -44,6 +47,7 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown():
     print(f"Shutting down {settings.app_name}")
+
 
 if __name__ == "__main__":
     uvicorn.run(
