@@ -133,6 +133,7 @@ class TransactionService:
                 detail="Transaction not found"
             )
 
+        # Update transaction
         transaction.reject_classification(
             self.db,
             user_id=user_id,
@@ -140,7 +141,13 @@ class TransactionService:
             new_account_id=str(correction.account_id)
         )
 
-        #TODO: To learn from this correction for future use
+        #Teach the AI from this correction
+        agent = ClassificationAgent(self.db, self.company_id)
+        agent.learn_from_correction(
+            transaction,
+            correction.category,
+            str(correction.account_id)
+        )
 
         return transaction
 

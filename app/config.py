@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     pinecone_api_key: Optional[str] = None
     pinecone_environment: Optional[str] = None
 
+    # Pinecone
+    pinecone_api_key: Optional[str] = None
+    pinecone_environment: Optional[str] = None
+    pinecone_index_name: str = "accuratea-patterns"
+
     class Config:
         env_file = ".env"
         case_sensitive = False
@@ -27,6 +32,8 @@ def display_config():
     print(f"Environment: {settings.debug}")
     print(f"Database: {settings.database_url.split('@')[1] if '@' in settings.database_url else 'Not configured'}")
     print(f"OpenAI: {'Working' if settings.openai_api_key else 'Not working'}")
+    print(f"Pinecone Configured: {'Successfully' if settings.pinecone_api_key else 'No Pinecone API KEY'}")
+
     print("=" * 30)
 
 

@@ -1,11 +1,10 @@
 import json
 from typing import Dict, Any, Optional, List
-
 from click import prompt
 from sqlalchemy.orm import Session
 from app.agents.base_agent import BaseAgent
 from app.models import Transaction, Account, Company
-
+from app.utils.vector_store import vector_store
 
 class ClassificationAgent(BaseAgent):
     """This agent classifies transactions into Category, GL Acct, and confidence score"""
@@ -17,17 +16,21 @@ class ClassificationAgent(BaseAgent):
         #Load company context
         self.company = Company.get_by_id(db, company_id)
         self.accounts = Account.get_company_accounts(db, company_id)
-
+        self.vector_store = vector_store
 
     def classify_transaction(
         self,
         transaction: Transaction
     ) -> Dict[str, Any]:
-        """Classify a transaction using AI"""
+        """Classify a transaction using AI & Historical patterns"""
 
         self.log(f"Classifying transaction: {transaction.counterparty_name} - ${transaction.amount}")
 
-        prompt = self._build_classification_prompt(transaction)
+        #Search for similar patterns
+        similar_patterns = self._find_similar_patterns(transaction)
+        #Build enhanced prompt with patterns
+        prompt = self._build_enhanced_prompt(transaction, similar_patterns)
+        # prompt = self._build_classification_prompt(transaction)
 
         #Call GPT-4
         response = self.call_llm(
@@ -48,9 +51,144 @@ class ClassificationAgent(BaseAgent):
         # parse response
         result = self._parse_response(response)
 
-        self.log(f"Classification: {result['category']} (confidence: {result['confidence']:.2f})")
+        #Store this classification as a pattern
+        self._store_pattern(transaction, result)
+
+        self.log(f"Classification Result: {result['category']} (confidence: {result['confidence']:.2f})")
 
         return  result
+
+    def _find_similar_patterns(
+        self,
+        transaction: Transaction
+    ) -> List[Dict[str, Any]]:
+        """Find similar past transactions"""
+        if not self.vector_store:
+            return []
+
+        self.log("====== Searching for similar patterns...")
+
+        similar = self.vector_store.find_similar_patterns(
+            company_id=self.company_id,
+            vendor=transaction.counterparty_name or "",
+            description=transaction.description or "",
+            amount=float(transaction.amount),
+            top_k=3  # Get top 3 similar
+        )
+
+        #Filter by relevance score > 0.8 = verify similar
+        relevant = [p for p in similar if p['score'] > 0.8]
+
+        self.log(f"Found {len(relevant)} relevant patterns")
+
+        return relevant
+
+    def _build_enhanced_prompt(
+            self,
+            transaction: Transaction,
+            similar_patterns: List[Dict[str, Any]]
+    ) -> str:
+        """Build prompt with historical context"""
+        prompt = f"""Classify this transaction:
+
+        Date: {transaction.transaction_date}
+        Amount: ${transaction.amount} {transaction.currency}
+        Vendor: {transaction.counterparty_name}
+        Description: {transaction.description or "N/A"}
+        Source: {transaction.source_type}
+        """
+
+        if similar_patterns:
+            prompt += "\n\n HISTORICAL PATTERNS (past similar transactions):\n"
+
+            for i, pattern in enumerate(similar_patterns, 1):
+                meta = pattern["metadata"]
+                score = pattern["score"]
+
+                prompt += f"""
+                Pattern {i} (similarity: {score:.2f}):
+                - Vendor: {meta['vendor']}
+                - Category: {meta['category']}
+                - Account: {meta['account_code']}
+                - Source: {meta['source']}
+                """
+
+                # Highlight user corrections - (more important)
+                if meta['source'] == 'user':
+                    prompt += "(User-confirmed)"
+
+                prompt += "\n"
+
+            prompt += "\nConsider these patterns when making your decision"
+
+        prompt += "\n\nAnalyze and assign to the correct GL account"
+
+        return prompt
+
+    def _store_pattern(
+        self,
+        transaction: Transaction,
+        result: Dict[str, Any]
+    ):
+        """Store classification as a pattern"""
+        if not self.vector_store:
+            return
+
+        try:
+            self.vector_store.store_classification_pattern(
+                pattern_id=f"txn-{transaction.id}",
+                company_id=self.company_id,
+                vendor=transaction.counterparty_name or "",
+                description=transaction.description or "",
+                amount=float(transaction.amount),
+                category=result["category"],
+                account_code=result["account_code"],
+                account_id=result["account_id"],
+                confidence=result["confidence"],
+                source="ai"
+            )
+
+            self.log("======= Pattern stored in vector database")
+
+        except Exception as e:
+            self.log(f"Failed to store pattern: {e}")
+
+    def learn_from_correction(
+        self,
+        transaction: Transaction,
+        correct_category: str,
+        correct_account_id: str
+    ):
+        """Learn from user correction"""
+        if not self.vector_store:
+            return
+
+        self.log(f"Learning from correction for: {transaction.counterparty_name}")
+
+        #Get account code
+        account = self.db.query(Account).filter(
+            Account.id == correct_account_id
+        ).first()
+
+        if not account:
+            return
+
+        # Store correction with higher priority (source='user')
+        self.vector_store.store_classification_pattern(
+            pattern_id=f"correction-{transaction.id}",
+            company_id=self.company_id,
+            vendor=transaction.counterparty_name or "",
+            description=transaction.description or "",
+            amount=float(transaction.amount),
+            category=correct_category,
+            account_code=account.account_code,
+            account_id=correct_account_id,
+            confidence=1.0,  # User corrections are 100% confident
+            source="user"  # This marks it as user-corrected
+        )
+
+        self.log("======== Learned from correction!")
+
 
 
     def _get_system_prompt(self) -> str:
@@ -66,10 +204,10 @@ class ClassificationAgent(BaseAgent):
                 Instructions:
                 1. Analyze the transaction details
                 2. Choose the most appropriate GL account
-                3. Provide a confidence score within (0-1)
+                3. Provide a confidence score within the range of (0-1)
                 4. Explain your reasoning
                 
-                Respond in JSON format:
+                Respond in JSON format for example:
                 {{
                     "category": "Category name",
                     "account_code": "Account code (e.g., 6100)",
@@ -124,7 +262,7 @@ class ClassificationAgent(BaseAgent):
             return {
                 "category": result["category"],
                 "account_code": result["account_code"],
-                "account_id": str("account.id"),
+                "account_id": str(account.id),
                 "confidence": result["confidence"],
                 "reasoning": result["reasoning"]
             }
