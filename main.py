@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api import auth, transactions, accounts
+from app.api import auth, transactions, accounts, journal_entries
 import uvicorn
 
 app = FastAPI(
@@ -22,6 +22,8 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
+app.include_router(journal_entries.router)
+
 
 @app.get("/")
 def root():
