@@ -4,10 +4,12 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from app.models import Transaction, Company
 from app.agents.classification_agent import ClassificationAgent
+from app.agents.journal_entry_agent import JournalEntryAgent
 from app.schemas.transaction import (
     TransactionCreateSchema,
     ClassificationCorrectionSchema
 )
+import traceback
 
 class TransactionService:
     """This has the transaction CRUD operations, Classification and user corrections"""
@@ -34,9 +36,33 @@ class TransactionService:
             memo=transaction_data.memo,
             source_type=transaction_data.source_type
         )
-
+        
         if auto_classify:
             self.classify_transaction(transaction)
+
+            # Create journal entry if classification is successful
+            if transaction.gl_account:
+                try:
+                    je_agent = JournalEntryAgent(self.db, self.company_id)
+                    journal_entry = je_agent.create_entry_from_transaction(transaction)
+
+                    confidence = transaction.classification_confidence or 0
+
+                    #auto post if high confidence
+                    if confidence >= 0.95:
+                        je_agent.post_entry(journal_entry, None) # None = AI posted
+
+                        #Mark transaction as fully processed
+                        transaction.status = "processed"
+                        transaction.update(self.db)
+
+                        print(f"Journal entry created: {journal_entry.entry_number} (draft)")
+                    else:
+                        print(f"Journal entry {journal_entry.entry_number} in DRAFT (confidence: {confidence:.2%})")
+
+                except Exception as e:
+                    print(f"Failed to create journal entry: {e}")
+                    traceback.print_exc()
 
         return transaction
 

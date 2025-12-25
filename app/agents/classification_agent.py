@@ -201,22 +201,32 @@ class ClassificationAgent(BaseAgent):
                 Available accounts:
                 {self._format_accounts_for_prompt()}
                 
-                Instructions:
-                1. Analyze the transaction details
-                2. Choose the most appropriate GL account
-                3. Provide a confidence score within the range of (0-1)
-                4. Explain your reasoning
+                CRITICAL: You MUST respond with ONLY valid JSON in this EXACT format (no other text):
+
+                {{
+                    "category": "Category name here",
+                    "account_code": "XXXX",
+                    "confidence": 0.95,
+                    "reasoning": "Brief explanation here"
+                }}
                 
-                Respond in JSON format for example:
+                Rules:
+                1. Choose an account_code that EXISTS in the list above
+                2. Confidence must be a number between 0 and 1
+                3. Category should describe what the expense is for
+                4. Reasoning should explain your choice
+                5. If unsure (confidence < 0.70), explain why in reasoning
+                
+                Example response:
                 {{
                     "category": "Category name",
-                    "account_code": "Account code (e.g., 6100)",
+                    "account_code": "Account code (e.g., 6200)",
                     "confidence": 0.95,
-                    "reasoning": "Brief explanation"
+                    "reasoning": "AWS is a cloud hosting provider, clearly maps to Cloud Infrastructure account"
                 }}
                 
                 
-                Be conservative - if you're not confident (< 0.70), explain why.
+                DO NOT include any other text, markdown formatting, or explanations outside the JSON object.
                 """
 
     def _format_accounts_for_prompt(self) -> str:
@@ -246,8 +256,31 @@ class ClassificationAgent(BaseAgent):
         try:
             content = response.choices[0].message.content
 
+            self.log(f"Raw AI response: {content[:200]}...")
+
+            if "```json" in content:
+                # Extract JSON from code block
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                json_str = content[start:end].strip()
+            elif "```" in content:
+                # Extract from any code block
+                start = content.find("```") + 3
+                end = content.find("```", start)
+                json_str = content[start:end].strip()
+            else:
+                # Assume entire content is JSON
+                json_str = content.strip()
+
             #parse json
-            result = json.loads(content)
+            result = json.loads(json_str)
+
+            self.log(f"Parsed: {result['category']} -> {result['account_code']}")
+
+            required_fields = ["category", "account_code", "confidence", "reasoning"]
+            for field in required_fields:
+                if field not in result:
+                    raise ValueError(f"Missing required field: {field}")
 
             #Find the account by code
             account = Account.get_by_code(
@@ -257,7 +290,19 @@ class ClassificationAgent(BaseAgent):
             )
 
             if not account:
-                raise ValueError(f"Account {result['account_code']} not found")
+                self.log(f"Account {result['account_code']} not found!")
+                # Try to find a reasonable default
+                default_account = self.db.query(Account).filter(
+                    Account.company_id == self.company_id,
+                    Account.account_type == "expense",
+                    Account.is_active == True
+                ).first()
+
+                if default_account:
+                    self.log(f"Using default account: {default_account.account_code}")
+                    account = default_account
+                else:
+                    raise ValueError(f"Account {result['account_code']} not found and no default available")
 
             return {
                 "category": result["category"],
@@ -269,20 +314,47 @@ class ClassificationAgent(BaseAgent):
 
         except json.JSONDecodeError as e:
             self.log(f"Failed to parse JSON: {e}")
-            if self.accounts:
-                account_id = str(self.accounts[0].id)
-            #Return low confidence if parsing fail
+            self.log(f"Content: {content}")
+
+            # Return safe default with zero confidence
+            default_account = self.db.query(Account).filter(
+                Account.company_id == self.company_id,
+                Account.account_code == "6100"  # Office Expenses
+            ).first()
+
+            if not default_account:
+                # Fallback to any expense account
+                default_account = self.db.query(Account).filter(
+                    Account.company_id == self.company_id,
+                    Account.account_type == "expense"
+                ).first()
+
             return {
-                "category": "Unknown",
-                "account_code": "6100",  # Default to office expenses
-                "account_id": account_id,
+                "category": "Unknown - Needs Review",
+                "account_code": default_account.account_code if default_account else "6100",
+                "account_id": str(default_account.id) if default_account else "",
                 "confidence": 0.0,
-                "reasoning": "Failed to parse AI response"
+                "reasoning": f"AI response parsing failed: {str(e)}"
             }
 
         except Exception as e:
             self.log(f"Error parsing response: {e}")
-            raise
+            import traceback
+            traceback.print_exc()
+
+            # Return safe default
+            default_account = self.db.query(Account).filter(
+                Account.company_id == self.company_id,
+                Account.account_code == "6100"
+            ).first()
+
+            return {
+                "category": "Unknown - Error",
+                "account_code": default_account.account_code if default_account else "6100",
+                "account_id": str(default_account.id) if default_account else "",
+                "confidence": 0.0,
+                "reasoning": f"Classification error: {str(e)}"
+            }
 
     def classify_batch(
         self,

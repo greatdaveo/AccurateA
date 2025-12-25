@@ -226,6 +226,13 @@ class Transaction(BaseModel):
         self.update(db)
 
 
+    def mark_as_processed(self, db: Session):
+        """Mark transaction as fullly processed"""
+
+        self.status = "processed"
+        self.update(db)
+
+
     def approve_classification(self, db: Session, user_id: str):
         """User approves the classification"""
 

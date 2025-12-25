@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     database_url: str
     secret_key: str
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30
+    access_token_expire_minutes: int = 60 * 24 * 30
     openai_api_key: Optional[str] = None
     pinecone_api_key: Optional[str] = None
     pinecone_environment: Optional[str] = None
