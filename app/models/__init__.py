@@ -4,7 +4,7 @@ from app.models.user import User
 from app.models.account import Account
 from app.models.transaction import Transaction
 from app.models.journal_entry import JournalEntry, JournalEntryLine
-
+from app.models.financial_statement import FinancialStatement
 
 #Export all models
 __all__ = [
@@ -14,6 +14,7 @@ __all__ = [
     "Account",
     "Transaction",
     "JournalEntry",
-    "JournalEntryLine"
+    "JournalEntryLine",
+    "FinancialStatement"
 ]
 

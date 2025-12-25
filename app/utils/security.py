@@ -52,7 +52,7 @@ class JWTTokenService:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(
-                minutes=self.access_token_expire_minutes
+                days=self.access_token_expire_minutes
             )
 
         to_encode.update({
