@@ -43,7 +43,7 @@ async def setup_tax_categories(
     Set up default tax categories
     Creates IRS-compliant tax categories for expense classification.
     """
-    
+
     service = TaxService(db, str(current_user.company_id))
     categories = service.setup_tax_categories()
 
