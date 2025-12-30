@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from app.models import Transaction, Company
 from app.agents.classification_agent import ClassificationAgent
 from app.agents.journal_entry_agent import JournalEntryAgent
+from app.agents.tax_compliance_agent import TaxComplianceAgent
 from app.schemas.transaction import (
     TransactionCreateSchema,
     ClassificationCorrectionSchema
@@ -38,11 +39,11 @@ class TransactionService:
         )
         
         if auto_classify:
-            self.classify_transaction(transaction)
+            try:
+                self.classify_transaction(transaction)
 
-            # Create journal entry if classification is successful
-            if transaction.gl_account:
-                try:
+                # Create journal entry if classification is successful
+                if transaction.gl_account_id:
                     je_agent = JournalEntryAgent(self.db, self.company_id)
                     journal_entry = je_agent.create_entry_from_transaction(transaction)
 
@@ -60,9 +61,17 @@ class TransactionService:
                     else:
                         print(f"Journal entry {journal_entry.entry_number} in DRAFT (confidence: {confidence:.2%})")
 
-                except Exception as e:
-                    print(f"Failed to create journal entry: {e}")
-                    traceback.print_exc()
+                    try:
+                        tax_agent = TaxComplianceAgent(self.db, self.company_id)
+                        tax_agent.analyze_transaction(transaction)
+                        print(f"Tax analysis complete")
+                        
+                    except Exception as e:
+                        print(f"Tax analysis failed: {e}")
+
+            except Exception as e:
+                print(f"Failed to create journal entry: {e}")
+                traceback.print_exc()
 
         return transaction
 

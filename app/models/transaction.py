@@ -89,6 +89,31 @@ class Transaction(BaseModel):
         comment="Department or cost center"
     )
 
+    tax_category_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tax_categories.id"),
+        nullable=True,
+        comment="Tax category"
+    )
+
+    is_deductible = Column(
+        Boolean,
+        nullable=True,
+        comment="Is this expense tax deductible?"
+    )
+
+    deductible_amount = Column(
+        Numeric(15, 2),
+        nullable=True,
+        comment="Amount that's deductible for tax"
+    )
+
+    tax_year = Column(
+        Numeric(4, 0),
+        nullable=True,
+        comment="Tax year (YYYY)"
+    )
+
     classification_status = Column(
         String(20),
         default="pending",
@@ -131,6 +156,7 @@ class Transaction(BaseModel):
     #Relationships
     company = relationship("Company", backref="transactions")
     gl_account = relationship("Account", backref="transactions")
+    tax_category = relationship("TaxCategory", backref="transactions")
     reviewed_by = relationship("User", backref="reviewed_transactions")
 
 

@@ -7,6 +7,8 @@ from app.models.journal_entry import JournalEntry, JournalEntryLine
 from app.models.financial_statement import FinancialStatement
 from app.models.bank_transaction import BankTransaction
 from app.models.reconciliation import Reconciliation
+from app.models.tax_category import TaxCategory
+
 
 #Export all models
 __all__ = [
@@ -20,5 +22,6 @@ __all__ = [
     "FinancialStatement",
     "BankTransaction",
     "Reconciliation",
+    "TaxCategory"
 ]
 
