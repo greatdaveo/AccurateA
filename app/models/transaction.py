@@ -133,6 +133,13 @@ class Transaction(BaseModel):
         comment="Who classified: ai, user, rule"
     )
 
+    journal_entry_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("journal_entries.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Linked journal entry (if posted)"
+    )
+
     status = Column(
         String(20),
         default="pending",
@@ -158,6 +165,12 @@ class Transaction(BaseModel):
     gl_account = relationship("Account", backref="transactions")
     tax_category = relationship("TaxCategory", backref="transactions")
     reviewed_by = relationship("User", backref="reviewed_transactions")
+    journal_entry = relationship(
+        "JournalEntry",
+        backref="source_transaction",
+        foreign_keys=[journal_entry_id],
+        uselist=False #one to one relationship
+    )
 
 
     @classmethod

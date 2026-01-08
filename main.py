@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
 from app.config import settings
 from app.api import (
     auth,
@@ -10,9 +12,20 @@ from app.api import (
     reconciliation,
     tax,
     anomaly,
-    plaid
+    plaid,
+    automation
 )
+from app.services.scheduler_service import scheduler
+
 import uvicorn
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """start scheduler on startup, stops on shutdown"""
+    scheduler.start()
+    yield
+    scheduler.shutdown()
 
 app = FastAPI(
     title=settings.app_name,
@@ -38,6 +51,7 @@ app.include_router(reconciliation.router)
 app.include_router(tax.router)
 app.include_router(anomaly.router)
 app.include_router(plaid.router)
+app.include_router(automation.router)
 
 
 @app.get("/")

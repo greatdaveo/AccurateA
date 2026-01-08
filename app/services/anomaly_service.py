@@ -15,7 +15,16 @@ class AnomalyService:
         agent = AnomalyDetectionAgent(self.db, self.company_id)
         results = agent.scan_all_transactions()
 
-        return results
+        return {
+            "anomalies_found": results["anomalies_found"],
+            "scanned": results["scanned"],
+            "critical": results["by_severity"]["critical"],
+            "high": results["by_severity"]["high"],
+            "medium": results["by_severity"]["medium"],
+            "low": results["by_severity"]["low"],
+            "by_type": results.get("by_type", {}),
+            "by_severity": results["by_severity"]  # Keep original structure too
+        }
 
     def get_pending_anomalies(
         self,
