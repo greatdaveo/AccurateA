@@ -9,7 +9,8 @@ from app.api import (
     financial_statements,
     reconciliation,
     tax,
-anomaly
+    anomaly,
+    plaid
 )
 import uvicorn
 
@@ -36,6 +37,7 @@ app.include_router(financial_statements.router)
 app.include_router(reconciliation.router)
 app.include_router(tax.router)
 app.include_router(anomaly.router)
+app.include_router(plaid.router)
 
 
 @app.get("/")

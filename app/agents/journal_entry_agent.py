@@ -94,6 +94,8 @@ class JournalEntryAgent(BaseAgent):
             3. Common transaction patterns:
                - Expense payment: DR Expense, CR Cash/Bank
                - Revenue receipt: DR Cash/Bank, CR Revenue
+               - Receivable decreases: DR Cash/Bank, CR Receivable 
+               - Payable decreases: DR Cash/Bank, CR Payable             
                - Asset purchase: DR Asset, CR Cash/Bank
                - Liability payment: DR Liability, CR Cash/Bank
                

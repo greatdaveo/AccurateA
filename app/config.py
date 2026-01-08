@@ -1,26 +1,39 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
     app_name: str = "AccurateA"
     app_env: str = "development"
     debug: bool = True
+
+    frontend_url: str = "http://localhost:5173"
+    backend_url: str = "http://localhost:8000"
+
     database_url: str
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 30
     openai_api_key: Optional[str] = None
-    pinecone_api_key: Optional[str] = None
-    pinecone_environment: Optional[str] = None
+
 
     # Pinecone
     pinecone_api_key: Optional[str] = None
     pinecone_environment: Optional[str] = None
     pinecone_index_name: str = "accuratea-patterns"
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    plaid_client_id: str
+    plaid_secret: str
+    plaid_environment: str = "sandbox"
+    plaid_products: str = "transactions"
+    plaid_country_codes: str = "US,CA"
+    plaid_recovery_code: Optional[str] = None
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra fields in .env
+    )
 
 
 settings = Settings()

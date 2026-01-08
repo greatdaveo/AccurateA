@@ -44,11 +44,13 @@ class BaseModel(Base):
     # This method operate on individual model instances
     def save(self, db: Session):
         """ Save this instance to DB """
-        db.add(self)
-        db.commit()
-        db.refresh(self)
-
-        return self
+        try:
+            db.add(self)
+            db.commit()
+            db.refresh(self)
+        except Exeption as e:
+            db.rollback()
+            return e
 
     def delete(self, db: Session, soft: bool = True):
         """ Delete this instance """

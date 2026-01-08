@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field, validator
+import uuid
+
+from pydantic import BaseModel, Field, ConfigDict, field_serializer
 from typing import Optional
 from datetime import date, datetime
 from uuid import UUID
@@ -92,6 +94,7 @@ class AccountSummarySchema(BaseModel):
 
 class TransactionResponseSchema(BaseModel):
     """ Schema for transaction response"""
+
     id: UUID
     transaction_date: date
     amount: Decimal
@@ -111,6 +114,18 @@ class TransactionResponseSchema(BaseModel):
     gl_account: Optional[AccountSummarySchema] = None
     # Timestamps
     created_at: datetime
+
+    @field_serializer('amount', 'classification_confidence')
+    def serialize_decimal(self, value):
+        """Convert Decimal to float for JSON serialization"""
+        if value is None:
+            return None
+        return float(value)
+
+    @field_serializer('id')
+    def serialize_uuid(self, value):
+        """Convert UUID to string"""
+        return str(value)
 
     class Config:
         from_attributes = True

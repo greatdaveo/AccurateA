@@ -54,6 +54,7 @@ marshmallow==3.26.1
 mdurl==0.1.2
 multidict==6.7.0
 mypy_extensions==1.1.0
+nulltype==2.3.1
 numpy==1.26.4
 openai==1.10.0
 packaging==24.2
@@ -62,6 +63,7 @@ pinecone==7.3.0
 pinecone-client==3.0.0
 pinecone-plugin-assistant==1.8.0
 pinecone-plugin-interface==0.0.7
+plaid-python==38.0.0
 pluggy==1.6.0
 prompt_toolkit==3.0.52
 propcache==0.4.1

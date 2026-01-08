@@ -9,6 +9,7 @@ from app.models.bank_transaction import BankTransaction
 from app.models.reconciliation import Reconciliation
 from app.models.tax_category import TaxCategory
 from app.models.anomaly import Anomaly
+from app.models.plaid_item import PlaidItem
 
 #Export all models
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "BankTransaction",
     "Reconciliation",
     "TaxCategory",
-    "Anomaly"
+    "Anomaly",
+    "PlaidItem"
 ]
 
