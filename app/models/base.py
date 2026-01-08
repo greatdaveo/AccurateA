@@ -48,7 +48,7 @@ class BaseModel(Base):
             db.add(self)
             db.commit()
             db.refresh(self)
-        except Exeption as e:
+        except Exception as e:
             db.rollback()
             return e
 

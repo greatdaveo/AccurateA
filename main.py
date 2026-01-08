@@ -13,7 +13,8 @@ from app.api import (
     tax,
     anomaly,
     plaid,
-    automation
+    automation,
+    email
 )
 from app.services.scheduler_service import scheduler
 
@@ -52,6 +53,7 @@ app.include_router(tax.router)
 app.include_router(anomaly.router)
 app.include_router(plaid.router)
 app.include_router(automation.router)
+app.include_router(email.router)
 
 
 @app.get("/")

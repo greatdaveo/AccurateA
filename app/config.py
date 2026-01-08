@@ -28,6 +28,20 @@ class Settings(BaseSettings):
     plaid_country_codes: str = "US,CA"
     plaid_recovery_code: Optional[str] = None
 
+    #Gmail API
+    gmail_client_id: Optional[str] = None
+    gmail_client_secret: Optional[str] = None
+    gmail_redirect_uri: str = "http://localhost:8000/api/email/oauth-callback"
+
+    #Dedicated Email box
+    receipt_email_host: str = "imap.gmail.com"
+    receipt_email_port: int = 993
+    receipt_email_address: Optional[str] = None
+    receipt_email_password: Optional[str] = None
+
+    #Email Processing
+    email_check_interval: int = 300  # 5 minutes
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

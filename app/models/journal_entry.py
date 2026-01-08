@@ -88,11 +88,14 @@ class JournalEntry(BaseModel):
     )
 
     company = relationship("Company", backref="journal_entries")
+
+    # JournalEntry -> Transaction (one-way reference)
     transaction = relationship(
         "Transaction",
-        foreign_keys="JournalEntry.transaction_id",
-        backref="generated_journal_entry"
+        foreign_keys=[transaction_id],
+        backref="journal_entry" # Transaction can access its journal_entry via backref
     )
+
 
     lines = relationship(
         "JournalEntryLine",

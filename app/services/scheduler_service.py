@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 
 from app.utils.database import SessionLocal
-from app.models import Company, Transaction, PlaidItem
+from app.models import Company, Transaction, JournalEntry, PlaidItem
 from app.services.plaid_service import PlaidService
 from app.agents.classification_agent import ClassificationAgent
 from app.agents.journal_entry_agent import JournalEntryAgent
@@ -47,6 +47,20 @@ class SchedulerService:
             name='Anomaly Detection Scan',
             replace_existing=True
         )
+
+        #Email monitoring
+        self.scheduler.add_job(
+            func=self.email_monitoring_job,
+            trigger=CronTrigger(minute='*/5'),  # Every 5 minutes
+            id='email_monitoring',
+            name='Email Receipt Monitoring',
+            replace_existing=True
+        )
+
+        # print("Scheduled jobs configured:")
+        # print("Daily Automation: 2:00 AM")
+        # print("Anomaly Scan: 6:00 AM, 6:00 PM")
+        # print("Email Monitoring: Every 5 minutes")
 
     def start(self):
         """Start the scheduler"""
@@ -111,10 +125,20 @@ class SchedulerService:
                 continue
 
         #Generate journal entries
-        classified_txns = db.query(Transaction).filter(
+        # classified_txns = db.query(Transaction).filter(
+        #     Transaction.company_id == company_id,
+        #     Transaction.classification_status == 'auto_approved',
+        #     Transaction.journal_entry_id.is_(None),
+        #     Transaction.deleted_at.is_(None)
+        # ).all()
+
+        classified_txns = db.query(Transaction).outerjoin(
+            JournalEntry,
+            JournalEntry.transaction_id == Transaction.id
+        ).filter(
             Transaction.company_id == company_id,
             Transaction.classification_status == 'auto_approved',
-            Transaction.journal_entry_id.is_(None),
+            JournalEntry.id.is_(None), #No journal entry exists
             Transaction.deleted_at.is_(None)
         ).all()
 
@@ -196,6 +220,22 @@ class SchedulerService:
                     continue
         finally:
             db.close()
+
+    def email_monitoring_job(self):
+        """Check Gmail and forwarding inboxes for new receipts"""
+        try:
+            # Monitor Gmail connections
+            GmailService.monitor_all_gmail_connections(db)
+
+            # Monitor forwarding addresses
+            IMAPService.monitor_all_forwarding_addresses(db)
+
+        except Exception as e:
+            print(f"Email monitoring error: {e}")
+
+        finally:
+            db.close()
+
 
 
 scheduler = SchedulerService()
