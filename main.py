@@ -14,7 +14,8 @@ from app.api import (
     anomaly,
     plaid,
     automation,
-    email
+    email,
+    import_data
 )
 from app.services.scheduler_service import scheduler
 
@@ -54,6 +55,8 @@ app.include_router(anomaly.router)
 app.include_router(plaid.router)
 app.include_router(automation.router)
 app.include_router(email.router)
+app.include_router(import_data.router)
+
 
 
 @app.get("/")
