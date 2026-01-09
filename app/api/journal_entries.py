@@ -33,6 +33,7 @@ class JournalEntryResponse(BaseModel):
     total_debits: float
     total_credits: float
     is_balanced: bool
+    lines: List[JournalEntryLineResponse]
 
     class Config:
         from_attributes = True
@@ -45,9 +46,10 @@ class JournalEntryResponse(BaseModel):
     description="Get all journal entries"
 )
 async def list_journal_entries(
-        status: str = None,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+    status: str = None,
+    source: str = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Get all journal entries for current company"""
     query = db.query(JournalEntry).filter(
@@ -57,6 +59,9 @@ async def list_journal_entries(
 
     if status:
         query = query.filter(JournalEntry.status == status)
+
+    if source:
+        query = query.filter(JournalEntry.source == source)
 
     entries = query.order_by(JournalEntry.entry_date.desc()).all()
 
@@ -70,10 +75,69 @@ async def list_journal_entries(
             source=e.source,
             total_debits=float(e.get_total_debits()),
             total_credits=float(e.get_total_credits()),
-            is_balanced=e.is_balanced()
+            is_balanced=e.is_balanced(),
+            lines=[
+                JournalEntryLineResponse(
+                    id=str(line.id),
+                    account_code=line.account.account_code,
+                    account_name=line.account.account_name,
+                    debit=float(line.debit),
+                    credit=float(line.credit),
+                    description=line.description or ""
+                )
+                for line in e.lines
+            ]
         )
         for e in entries
     ]
+
+@router.get(
+    "/{entry_id}",
+    response_model=JournalEntryResponse,
+    summary="Get journal entry",
+    description="Get a single journal entry with its lines"
+)
+async def get_journal_entry(
+    entry_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a single journal entry"""
+    entry = db.query(JournalEntry).filter(
+        JournalEntry.id == entry_id,
+        JournalEntry.company_id == current_user.company_id,
+        JournalEntry.deleted_at.is_(None)
+    ).first()
+
+    if not entry:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Journal entry not found"
+        )
+
+    return JournalEntryResponse(
+        id=str(entry.id),
+        entry_number=entry.entry_number,
+        entry_date=str(entry.entry_date),
+        description=entry.description,
+        status=entry.status,
+        source=entry.source,
+        total_debits=float(entry.get_total_debits()),
+        total_credits=float(entry.get_total_credits()),
+        is_balanced=entry.is_balanced(),
+        lines=[
+            JournalEntryLineResponse(
+                id=str(line.id),
+                account_code=line.account.account_code,
+                account_name=line.account.account_name,
+                debit=float(line.debit),
+                credit=float(line.credit),
+                description=line.description or ""
+            )
+            for line in entry.lines
+        ]
+    )
+
 
 
 @router.post(
@@ -82,14 +146,15 @@ async def list_journal_entries(
     description="Post journal entry to general ledger"
 )
 async def post_journal_entry(
-        entry_id: str,
-        current_user: User = Depends(get_current_user),
-        db: Session = Depends(get_db)
+    entry_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Post a journal entry"""
     entry = db.query(JournalEntry).filter(
         JournalEntry.id == entry_id,
-        JournalEntry.company_id == current_user.company_id
+        JournalEntry.company_id == current_user.company_id,
+        JournalEntry.deleted_at.is_(None)
     ).first()
 
     if not entry:
@@ -104,9 +169,19 @@ async def post_journal_entry(
             detail="Only draft entries can be posted"
         )
 
+    if not entry.is_balanced():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot post unbalanced entry"
+        )
+
     try:
         entry.post(db, str(current_user.id))
-        return {"message": "Journal entry posted successfully"}
+        return {
+            "success": True,
+            "message": "Journal entry posted successfully",
+            "entry_number": entry.entry_number
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -141,7 +216,18 @@ async def get_draft_entries(
             source=e.source,
             total_debits=float(e.get_total_debits()),
             total_credits=float(e.get_total_credits()),
-            is_balanced=e.is_balanced()
+            is_balanced=e.is_balanced(),
+            lines=[
+                JournalEntryLineResponse(
+                    id=str(line.id),
+                    account_code=line.account.account_code,
+                    account_name=line.account.account_name,
+                    debit=float(line.debit),
+                    credit=float(line.credit),
+                    description=line.description or ""
+                )
+                for line in e.lines
+            ]
         )
         for e in entries
     ]
