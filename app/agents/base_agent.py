@@ -18,6 +18,7 @@ class BaseAgent:
         if not self.client:
             raise Exception("OpenAI client not initialized. Check API key.")
 
+
         return self.client.chat_completion(
             messages=messages,
             model=self.model,
