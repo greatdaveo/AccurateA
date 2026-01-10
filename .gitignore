@@ -1,7 +1,26 @@
+# Logs
+logs/
+*.log
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[codz]
+*.py[cod]
 *$py.class
+.Python
+*.so
+.env
+.venv
+venv/
+
+# Database
+*.db
+*.sqlite
+
+
+# IDE
+.vscode/
+.idea/
+*.swp
 
 # C extensions
 *.so

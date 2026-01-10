@@ -1,15 +1,32 @@
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+# from sqlalchemy.pool import QueuePool
 from app.config import settings
 
 engine = create_engine(
     settings.database_url,
+    # poolclass=QueuePool,
     echo=settings.debug,
+    pool_size=10,
+    max_overflow=20,
     pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10
+    # pool_recycle=3600,  # Recycle connections every hour
+    connect_args={
+        "connect_timeout": 10,
+        "options": "-c timezone=utc"
+    }
 )
+
+# @event.listens_for(engine, "connect")
+# def receive_connect(dbapi_conn, connection_record):
+#     from app.utils.logger import logger
+#     logger.debug("Database connection opened")
+#
+# @event.listens_for(engine, "checkout")
+# def receive_checkout(dbapi_conn, connection_record, connection_proxy):
+#     from app.utils.logger import logger
+#     logger.debug("Connection checked out from pool")
 
 SessionLocal = sessionmaker(
     autocommit=False,

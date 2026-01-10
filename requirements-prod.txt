@@ -1,0 +1,5 @@
+gunicorn==21.2.0           # Production WSGI server
+uvicorn[standard]==0.24.0  # High-performance ASGI server
+psutil==5.9.6              # System monitoring
+redis==5.0.1               # Caching (for future)
+python-multipart==0.0.6    # File uploads

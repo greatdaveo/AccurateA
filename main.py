@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.middleware.request_id import RequestIDMiddleware
+# from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import settings
@@ -18,7 +20,8 @@ from app.api import (
     import_data,
     dashboard,
     assets,
-    teabot
+    teabot,
+    health
 )
 from app.services.scheduler_service import scheduler
 
@@ -47,6 +50,10 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
+app.add_middleware(RequestIDMiddleware)
+
+
 app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
@@ -62,6 +69,7 @@ app.include_router(import_data.router)
 app.include_router(dashboard.router)
 app.include_router(assets.router)
 app.include_router(teabot.router)
+app.include_router(health.router)
 
 
 @app.get("/")
