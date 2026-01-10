@@ -17,7 +17,8 @@ from app.api import (
     email,
     import_data,
     dashboard,
-    assets
+    assets,
+    teabot
 )
 from app.services.scheduler_service import scheduler
 
@@ -60,7 +61,7 @@ app.include_router(email.router)
 app.include_router(import_data.router)
 app.include_router(dashboard.router)
 app.include_router(assets.router)
-
+app.include_router(teabot.router)
 
 
 @app.get("/")
