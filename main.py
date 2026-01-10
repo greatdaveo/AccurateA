@@ -16,7 +16,8 @@ from app.api import (
     automation,
     email,
     import_data,
-    dashboard
+    dashboard,
+    assets
 )
 from app.services.scheduler_service import scheduler
 
@@ -58,6 +59,7 @@ app.include_router(automation.router)
 app.include_router(email.router)
 app.include_router(import_data.router)
 app.include_router(dashboard.router)
+app.include_router(assets.router)
 
 
 

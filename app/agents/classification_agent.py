@@ -6,33 +6,35 @@ from app.agents.base_agent import BaseAgent
 from app.models import Transaction, Account, Company
 from app.utils.vector_store import vector_store
 
+
 class ClassificationAgent(BaseAgent):
     """This agent classifies transactions into Category, GL Acct, and confidence score"""
+
     def __init__(self, db: Session, company_id: str):
         super().__init__(name="ClassificationAgent")
         self.db = db
         self.company_id = company_id
 
-        #Load company context
+        # Load company context
         self.company = Company.get_by_id(db, company_id)
         self.accounts = Account.get_company_accounts(db, company_id)
         self.vector_store = vector_store
 
     def classify_transaction(
-        self,
-        transaction: Transaction
+            self,
+            transaction: Transaction
     ) -> Dict[str, Any]:
         """Classify a transaction using AI & Historical patterns"""
 
         self.log(f"Classifying transaction: {transaction.counterparty_name} - ${transaction.amount}")
 
-        #Search for similar patterns
+        # Search for similar patterns
         similar_patterns = self._find_similar_patterns(transaction)
-        #Build enhanced prompt with patterns
+        # Build enhanced prompt with patterns
         prompt = self._build_enhanced_prompt(transaction, similar_patterns)
         # prompt = self._build_classification_prompt(transaction)
 
-        #Call GPT-4
+        # Call GPT-4
         response = self.call_llm(
             messages=[
                 {
@@ -45,22 +47,23 @@ class ClassificationAgent(BaseAgent):
                 }
             ],
 
-            temperature = 0.1
+            temperature=0.1
         )
 
         # parse response
         result = self._parse_response(response)
 
-        #Store this classification as a pattern
+        # Store this classification as a pattern
         self._store_pattern(transaction, result)
 
         self.log(f"Classification Result: {result['category']} (confidence: {result['confidence']:.2f})")
 
-        return  result
+        return result
+
 
     def _find_similar_patterns(
-        self,
-        transaction: Transaction
+            self,
+            transaction: Transaction
     ) -> List[Dict[str, Any]]:
         """Find similar past transactions"""
         if not self.vector_store:
@@ -76,7 +79,7 @@ class ClassificationAgent(BaseAgent):
             top_k=3  # Get top 3 similar
         )
 
-        #Filter by relevance score > 0.8 = verify similar
+        # Filter by relevance score > 0.8 = verify similar
         relevant = [p for p in similar if p['score'] > 0.8]
 
         self.log(f"Found {len(relevant)} relevant patterns")
@@ -126,9 +129,9 @@ class ClassificationAgent(BaseAgent):
         return prompt
 
     def _store_pattern(
-        self,
-        transaction: Transaction,
-        result: Dict[str, Any]
+            self,
+            transaction: Transaction,
+            result: Dict[str, Any]
     ):
         """Store classification as a pattern"""
         if not self.vector_store:
@@ -154,10 +157,10 @@ class ClassificationAgent(BaseAgent):
             self.log(f"Failed to store pattern: {e}")
 
     def learn_from_correction(
-        self,
-        transaction: Transaction,
-        correct_category: str,
-        correct_account_id: str
+            self,
+            transaction: Transaction,
+            correct_category: str,
+            correct_account_id: str
     ):
         """Learn from user correction"""
         if not self.vector_store:
@@ -165,7 +168,7 @@ class ClassificationAgent(BaseAgent):
 
         self.log(f"Learning from correction for: {transaction.counterparty_name}")
 
-        #Get account code
+        # Get account code
         account = self.db.query(Account).filter(
             Account.id == correct_account_id
         ).first()
@@ -189,18 +192,16 @@ class ClassificationAgent(BaseAgent):
 
         self.log("======== Learned from correction!")
 
-
-
     def _get_system_prompt(self) -> str:
         """This tells the GPT who it is and what to do"""
         return f"""
                 You are an expert accounting classification agent for {self.company.name}, a {self.company.industry} company following {self.company.accounting_standard} standards. 
-                
+
                 Your job is to classify financial transactions by assigning them to the correct General Ledger (GL) account.
-                
+
                 Available accounts:
                 {self._format_accounts_for_prompt()}
-                
+
                 CRITICAL: You MUST respond with ONLY valid JSON in this EXACT format (no other text):
 
                 {{
@@ -209,14 +210,14 @@ class ClassificationAgent(BaseAgent):
                     "confidence": 0.95,
                     "reasoning": "Brief explanation here"
                 }}
-                
+
                 Rules:
                 1. Choose an account_code that EXISTS in the list above
                 2. Confidence must be a number between 0 and 1
                 3. Category should describe what the expense is for
                 4. Reasoning should explain your choice
                 5. If unsure (confidence < 0.70), explain why in reasoning
-                
+
                 Example response:
                 {{
                     "category": "Category name",
@@ -224,8 +225,8 @@ class ClassificationAgent(BaseAgent):
                     "confidence": 0.95,
                     "reasoning": "AWS is a cloud hosting provider, clearly maps to Cloud Infrastructure account"
                 }}
-                
-                
+
+
                 DO NOT include any other text, markdown formatting, or explanations outside the JSON object.
                 """
 
@@ -238,10 +239,9 @@ class ClassificationAgent(BaseAgent):
             )
         return "\n".join(lines)
 
-
     def _build_classification_prompt(self, transaction: Transaction) -> str:
         """Build prompt for specific transaction"""
-        prompt =  f"""
+        prompt = f"""
                 Classify this transaction:
                 Date: {transaction.transaction_date}
                 Amount: {transaction.amount} {transaction.currency}
@@ -272,7 +272,7 @@ class ClassificationAgent(BaseAgent):
                 # Assume entire content is JSON
                 json_str = content.strip()
 
-            #parse json
+            # parse json
             result = json.loads(json_str)
 
             self.log(f"Parsed: {result['category']} -> {result['account_code']}")
@@ -282,7 +282,7 @@ class ClassificationAgent(BaseAgent):
                 if field not in result:
                     raise ValueError(f"Missing required field: {field}")
 
-            #Find the account by code
+            # Find the account by code
             account = Account.get_by_code(
                 self.db,
                 self.company_id,
@@ -357,8 +357,8 @@ class ClassificationAgent(BaseAgent):
             }
 
     def classify_batch(
-        self,
-        transactions: List[Transaction]
+            self,
+            transactions: List[Transaction]
     ) -> List[Dict[str, Any]]:
         """Classify multiple transactions"""
 
@@ -379,7 +379,6 @@ class ClassificationAgent(BaseAgent):
                 })
 
         return results
-
 
 
 

@@ -12,6 +12,7 @@ from app.agents.journal_entry_agent import JournalEntryAgent
 from app.services.reconciliation_service import ReconciliationService
 from app.services.anomaly_service import AnomalyService
 from app.services.tax_service import TaxService
+from app.services.depreciation_service import DepreciationService
 
 
 class SchedulerService:
@@ -54,6 +55,15 @@ class SchedulerService:
             trigger=CronTrigger(minute='*/5'),  # Every 5 minutes
             id='email_monitoring',
             name='Email Receipt Monitoring',
+            replace_existing=True
+        )
+
+        #Monthly depreciation - last day of month at 11pm
+        self.scheduler.add_job(
+            func=self.monthly_depreciation_job,
+            trigger=CronTrigger(day='last', hour=23, minute=0),
+            id='monthly_depreciation',
+            name='Monthly Asset Depreciation',
             replace_existing=True
         )
 
@@ -236,6 +246,38 @@ class SchedulerService:
         finally:
             db.close()
 
+    def monthly_depreciation_job(self):
+        """Records depreciation for all assets on last day of month."""
+        db = SessionLocal()
+
+        try:
+            today = date.today()
+
+            companies = db.query(Company).filter(
+                Company.deleted_at.is_(None)
+            ).all()
+
+            print(f"Processing depreciation for {len(companies)} companies")
+
+            for company in companies:
+                try:
+                    service = DepreciationService(db, str(company.id))
+                    result = service.record_monthly_depreciation(
+                        today.month,
+                        today.year
+                    )
+
+                    print(f"{company.name}: ${result['total_depreciation']:.2f}")
+
+                except Exception as e:
+                    print(f"{company.name}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"Monthly depreciation error: {e}")
+
+        finally:
+            db.close()
 
 
 scheduler = SchedulerService()

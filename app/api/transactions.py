@@ -141,7 +141,7 @@ async def get_transaction(
 
 
 @router.post(
-    "/{transcription_id}/classify",
+    "/{transaction_id}/classify",
     response_model=ClassificationResultSchema,
     summary="Classify transaction",
     description="Classify a single transaction with AI"

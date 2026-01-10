@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import date, timedelta
 from app.utils.database import get_db
@@ -7,6 +7,7 @@ from app.models import User
 from app.services.trial_balance_service import TrialBalanceService
 from app.services.income_statement_service import IncomeStatementService
 from app.services.balance_sheet_service import BalanceSheetService
+from app.services.cash_flow_service import CashFlowService
 from app.agents.financial_statement_agent import FinancialStatementAgent
 
 
@@ -92,6 +93,29 @@ async def get_balance_sheet(
 
     return balance_sheet
 
+@router.get(
+    "/cash-flow-statement",
+    summary="Cash flow statement",
+    description="Generate cash flow statement using indirect method"
+)
+async def get_cash_flow_statement(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get Cash Flow Statement"""
+    try:
+        service = CashFlowService(db, str(current_user.company_id))
+        statement = service.generate_cash_flow_statement(start_date, end_date)
+
+        return statement
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.get(
     "/summary",
