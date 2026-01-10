@@ -1,34 +1,61 @@
+# CORE FRAMEWORK
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
-python-dotenv==1.0.0
+
+# PYDANTIC (Data Validation)
 pydantic==2.5.3
 pydantic-settings==2.1.0
-SQLAlchemy==2.0.25
-alembic==1.13.1
-psycopg2-binary==2.9.9
-openai==1.10.0
-langchain==0.1.0
-langchain-community==0.0.13
-langchain-core==0.1.10
-langchain-openai==0.0.2
-pinecone-client==3.0.0
-tiktoken==0.5.2
-plaid-python==38.0.0
-stripe==7.0.0
-google-api-python-client==2.187.0
-google-auth==2.41.1
-google-auth-oauthlib==1.2.3
-google-auth-httplib2==0.3.0
-APScheduler==3.11.2
-pandas==2.2.0
-openpyxl==3.1.5
-pillow==11.0.0
-python-dateutil==2.8.2
-requests==2.32.3
-httpx==0.26.0
-redis==5.0.1
-psutil==5.9.6
 email-validator==2.1.0
+
+# DATABASE
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# AUTHENTICATION & SECURITY
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.1.2
+
+# AI/LLM & VECTOR STORE
+openai==1.12.0
+pinecone-client==3.0.0
+langchain==0.1.0
+langchain-community==0.0.20
+langchain-core==0.1.23
+langchain-openai==0.0.2
+
+# EXTERNAL INTEGRATIONS
+# Banking
+plaid-python==18.0.0
+
+# Payments
+stripe==8.0.0
+
+# Email (Gmail OAuth)
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+google-api-python-client==2.116.0
+
+# DATA PROCESSING
+pandas==2.2.0
+openpyxl==3.1.2
+
+# Fuzzy matching (for reconciliation)
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.25.0
+apscheduler==3.10.4
+
+# HTTP & NETWORKING
+httpx==0.27.0
+requests>=2.32.3  # Fix conflict with pinecone-plugin-assistant
+packaging>=23.2,<24.0  # Fix conflict with langchain-core
+
+# UTILITIES
+python-dateutil==2.8.2
+pytz==2024.1
+python-dotenv==1.0.0
+
+# MONITORING
+psutil==5.9.8
