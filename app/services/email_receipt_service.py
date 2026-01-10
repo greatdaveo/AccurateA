@@ -39,8 +39,11 @@ class EmailReceiptService:
             transaction.save(self.db)
 
             #Auto classify
-            agent = ClassificationAgent(self.db, self.company_id)
-            classification = agent.classify_transaction(transaction)
+            try:
+                agent = ClassificationAgent(self.db, self.company_id)
+                classification = agent.classify_transaction(transaction)
+            except:
+                print(f"Classification failed: {e}")
 
             return transaction
 
@@ -88,8 +91,11 @@ class EmailReceiptService:
             """
 
         try:
-            response = openai_client.chat.completions.create(
-                model="gpt-4",
+            if not openai_client:
+                print("OpenAI client not configured")
+                return None
+
+            response = openai_client.chat_completion(
                 messages=[
                     {
                         "role": "system",

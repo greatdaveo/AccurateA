@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     #Gmail API
     gmail_client_id: Optional[str] = None
     gmail_client_secret: Optional[str] = None
-    gmail_redirect_uri: str = "http://localhost:8000/api/email/oauth-callback"
+    gmail_redirect_uri: str = "http://localhost:8000/email/oauth-callback"
 
     #Dedicated Email box
     receipt_email_host: str = "imap.gmail.com"

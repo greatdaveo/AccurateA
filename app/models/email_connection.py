@@ -1,7 +1,9 @@
 from sqlalchemy import Column, String, JSON, Boolean, ForeignKey, Index
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Session
 from typing import Optional
+import uuid
 
 from app.models.base import BaseModel
 
@@ -90,6 +92,12 @@ class EmailConnection(BaseModel):
         tokens: dict
     ) -> 'EmailConnection':
         """Create Gmail OAuth Connection"""
+
+        if isinstance(company_id, str):
+            company_id = uuid.UUID(company_id)
+        if isinstance(user_id, str):
+            user_id = uuid.UUID(user_id)
+
         conn = cls(
             company_id=company_id,
             user_id=user_id,
@@ -135,14 +143,18 @@ class EmailConnection(BaseModel):
 
     def update_stats(self, db: Session, success: bool):
         """Update processing stats"""
-        stats = self.emails_processed or {"total": 0, "success": 0, "failed": 0}
-        stats['total'] += 1
-        if success:
-            stats['success'] += 1
-        else:
-            stats['failed'] += 1
+        if not self.emails_processed:
+            self.emails_processed = {"total": 0, "success": 0, "failed": 0}
 
-        self.emails_processed = stats
+        self.emails_processed['total'] += 1
+
+        if success:
+            self.emails_processed['success'] += 1
+        else:
+            self.emails_processed['failed'] += 1
+
+        flag_modified(self, 'emails_processed')
+
         self.update(db)
 
     def mark_checked(self, db: Session):

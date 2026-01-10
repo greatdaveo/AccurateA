@@ -1,6 +1,7 @@
 import base64
 import pickle
 import os
+import traceback
 
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
@@ -49,6 +50,7 @@ class GmailService:
         auth_url, _ = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
+            prompt='consent',
             state=f"{self.company_id}:{user_id}"
         )
 
@@ -60,62 +62,70 @@ class GmailService:
         state: str
     ) -> EmailConnection:
         """Handle OAuth callback and save tokens"""
-        company_id, user_id = state.split(':')
+        try:
+            company_id, user_id = state.split(':')
 
-        # Exchange code for tokens
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": settings.gmail_client_id,
-                    "client_secret": settings.gmail_client_secret,
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "redirect_uris": [settings.gmail_redirect_uri]
-                }
-            },
-            scopes=self.SCOPES,
-            redirect_uri=settings.gmail_redirect_uri
-        )
-
-        flow.fetch_token(code=code)
-        creds = flow.credentials
-
-        # Get user email address
-        service = build("gmail", 'v1', credentials=creds)
-        profile = service.users().getProfile(user_id="me").execute()
-        email_address = profile["emailAddress"]
-
-        # Save tokens
-        tokens = {
-            'token': creds.token,
-            'refresh_token': creds.refresh_token,
-            'token_uri': creds.token_uri,
-            'client_id': creds.client_id,
-            'client_secret': creds.client_secret,
-            'scopes': creds.scopes
-        }
-
-        # Create or update connection
-        connection = EmailConnection.get_company_connection(self.db, company_id)
-
-        if connection:
-            connection.connection_type = 'gmail_oauth'
-            connection.gmail_email = email_address
-            connection.gmail_tokens = tokens
-            connection.is_active = True
-            connection.update(self.db)
-        else:
-            connection = EmailConnection.create_gmail_connection(
-                self.db,
-                company_id=company_id,
-                user_id=user_id,
-                gmail_email=email_address,
-                tokens=tokens
+            # Exchange code for tokens
+            flow = Flow.from_client_config(
+                {
+                    "web": {
+                        "client_id": settings.gmail_client_id,
+                        "client_secret": settings.gmail_client_secret,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                        "redirect_uris": [settings.gmail_redirect_uri]
+                    }
+                },
+                scopes=self.SCOPES,
+                redirect_uri=settings.gmail_redirect_uri
             )
 
-        print(f"Gmail connected: {email_address}")
+            flow.fetch_token(code=code)
+            creds = flow.credentials
 
-        return connection
+            # Get user email address
+            service = build("gmail", 'v1', credentials=creds)
+            profile = service.users().getProfile(userId="me").execute()
+            email_address = profile["emailAddress"]
+
+            # Save tokens
+            tokens = {
+                'token': creds.token,
+                'refresh_token': creds.refresh_token,
+                'token_uri': creds.token_uri,
+                'client_id': creds.client_id,
+                'client_secret': creds.client_secret,
+                'scopes': creds.scopes,
+                'expiry': creds.expiry.isoformat() if creds.expiry else None
+            }
+
+            # Create or update connection
+            connection = EmailConnection.get_company_connection(self.db, company_id)
+
+            if connection:
+                # Update existing connection
+                connection.connection_type = 'gmail_oauth'
+                connection.gmail_email = email_address
+                connection.gmail_tokens = tokens
+                connection.is_active = True
+                connection.error = None
+                connection.update(self.db)
+            else:
+                connection = EmailConnection.create_gmail_connection(
+                    self.db,
+                    company_id=company_id,
+                    user_id=user_id,
+                    gmail_email=email_address,
+                    tokens=tokens
+                )
+
+            print(f"Gmail connected: {email_address}")
+
+            return connection
+        except Exception as e:
+            print(f"OAuth callback error {e}")
+            traceback.print_exc()
+            raise
 
 
     def get_credentials(self, connection: EmailConnection) -> Optional[Credentials]:
@@ -123,7 +133,14 @@ class GmailService:
         if not connection.gmail_tokens:
             return None
 
+        if not connection.gmail_tokens:
+            print("No tokens stored")
+            return None
+
         tokens = connection.gmail_tokens
+
+        required_fields = ['token', 'refresh_token', 'token_uri', 'client_id', 'client_secret']
+        missing_fields = [field for field in required_fields if not tokens.get(field)]
 
         creds = Credentials(
             token=tokens.get('token'),
@@ -137,7 +154,7 @@ class GmailService:
         #Refresh if expired
         if creds.expired and creds.refresh_token:
             try:
-                creds.refresh_token(Request())
+                creds.refresh(Request())
 
                 # Save updated tokens
                 connection.gmail_tokens = {
@@ -146,7 +163,8 @@ class GmailService:
                     'token_uri': creds.token_uri,
                     'client_id': creds.client_id,
                     'client_secret': creds.client_secret,
-                    'scopes': creds.scopes
+                    'scopes': creds.scopes,
+                    'expiry': creds.expiry.isoformat() if creds.expiry else None
                 }
                 connection.update(self.db)
 

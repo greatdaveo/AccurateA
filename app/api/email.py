@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 import secrets
+import traceback
 
 from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User, EmailConnection, Company
+from app.services.email_receipt_service import EmailReceiptService
 from app.services.gmail_service import GmailService
 from app.services.imap_service import IMAPService
 
@@ -215,6 +217,13 @@ async def check_emails_now(
     db: Session = Depends(get_db)
 ):
     """Check Emails Now - Manually trigger email monitoring (useful for testing)"""
+
+    print(f"\n{'=' * 60}")
+    print(f"📧 MANUAL EMAIL CHECK TRIGGERED")
+    print(f"   User: {current_user.email}")
+    print(f"   Company: {current_user.company_id}")
+    print(f"{'=' * 60}")
+
     connection = EmailConnection.get_company_connection(
         db,
         str(current_user.company_id)
@@ -227,6 +236,7 @@ async def check_emails_now(
         )
 
     try:
+
         if connection.connection_type == 'gmail_oauth':
             service = GmailService(db, str(current_user.company_id))
             emails = service.fetch_new_emails(connection)
@@ -236,29 +246,121 @@ async def check_emails_now(
         else:
             raise ValueError("Invalid connection type")
 
+        # Log email details
+        for idx, email_data in enumerate(emails, 1):
+            print(f"\n   Email {idx}:")
+            print(f"      From: {email_data.get('from', 'N/A')}")
+            print(f"      Subject: {email_data.get('subject', 'N/A')}")
+            print(f"      Body preview: {email_data.get('body', '')[:100]}...")
+
         # Process emails
-        from app.services.email_receipt_service import EmailReceiptService
         receipt_service = EmailReceiptService(db, str(current_user.company_id))
 
         created = 0
+        skipped = 0
+        errors = 0
         for email_data in emails:
-            if receipt_service.is_receipt_email(email_data):
+            #check if it is a receipt
+            is_receipt = receipt_service.is_receipt_email(email_data)
+
+            if not is_receipt:
+                print("Skipping non-receipt email")
+                skipped += 1
+                continue
+
+            try:
                 transaction = receipt_service.process_email(email_data)
+
                 if transaction:
                     created += 1
+                    connection.update_stats(db, success=True)
+                    db.commit()
+                else:
+                    print("Failed to create a transaction from email")
+                    errors += 1
+                    connection.update_stats(db, success=False)
+                    db.commit()
+            except Exception as e:
+                print(f"Error processing emaill transaction: {e}")
+                traceback.print_exc()
+                errors += 1
+                connection.update_stats(db, success=False)
+                db.commit()
 
         connection.mark_checked(db)
+        db.commit()
 
         return {
             'success': True,
             'emails_found': len(emails),
             'transactions_created': created,
+            'skipped': skipped,
+            'errors': errors,
             'message': f'Processed {len(emails)} emails, created {created} transactions'
         }
 
     except Exception as e:
+        print(f"Email Check Error {e}")
+        traceback.print_exc()
+        db.rollback()
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
 
+@router.post(
+    "/revoke-gmail",
+    summary="Revoke Gmail access",
+    description="Revoke Gmail authorization to allow re-auth with refresh token"
+)
+async def revoke_gmail(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """To remove Gmail Access
+    This forces Google to provide a new refresh token for next auth"""
+    connection = EmailConnection.get_company_connection(
+        db,
+        str(current_user.company_id)
+    )
+
+    if not connection or connection.connection_type != 'gmail_oauth':
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No Gmail connection found"
+        )
+
+    try:
+        # Revoke token with Google
+        import requests
+
+        tokens = connection.gmail_tokens
+        if tokens and tokens.get('token'):
+            revoke_url = f"https://oauth2.googleapis.com/revoke?token={tokens['token']}"
+            response = requests.post(revoke_url)
+
+            if response.status_code == 200:
+                print("Token revoked with Google")
+            else:
+                print(f"Revoke response: {response.status_code}")
+
+        # Delete connection
+        connection.is_active = False
+        connection.update(db)
+
+        return {
+            'success': True,
+            'message': 'Gmail access revoked. You can now reconnect to get a refresh token.'
+        }
+
+    except Exception as e:
+        print(f"Revoke error: {e}")
+        # Still mark as inactive even if revoke fails
+        connection.is_active = False
+        connection.update(db)
+
+        return {
+            'success': True,
+            'message': 'Connection disconnected. Manually revoke at https://myaccount.google.com/permissions'
+        }
