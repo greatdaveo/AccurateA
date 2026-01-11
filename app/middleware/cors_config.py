@@ -22,12 +22,12 @@ def get_cors_origins() -> list:
         return origins
 
     elif settings.app_env == "production":
-        # Only allow your production domains
+        # PRODUCTION DOMAINS
         origins = [
-            settings.frontend_url,
-            "https://accurate-a-web.vercel.app",
-            "https://accuratea.com",
             "https://www.accuratea.com",
+            "https://accuratea.com",
+            "https://accurate-a-web.vercel.app",
+            settings.frontend_url,
         ]
 
         # Remove any empty strings
@@ -51,7 +51,7 @@ def configure_cors(app):
 
     # Allowed methods - be specific in production
     if settings.app_env == "production":
-        allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH"]
+        allowed_methods = ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     else:
         allowed_methods = ["*"]
 
@@ -74,6 +74,7 @@ def configure_cors(app):
         allow_methods=allowed_methods,
         allow_headers=allowed_headers,
         max_age=600,  # Cache preflight requests for 10 minutes
+        expose_headers=["X-Request-ID"],  # Expose custom headers
     )
 
-    logger.info("CORS middleware configured successfully")
+    logger.info(f"CORS middleware configured successfully - Origins {origins}")

@@ -168,7 +168,7 @@ async def detailed_health(
     return health_status
 
 
-@router.get("/db")
+@router.get("/database")
 async def database_health(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db)

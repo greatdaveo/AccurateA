@@ -54,15 +54,18 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.app_env == "development" else None,
 )
 
+# CORS Middleware (cross-origin requests)
+configure_cors(app)
+
 # MIDDLEWARE CONFIGURATION
-# 1. Trusted Host Middleware (first line of defense)
+# Trusted Host Middleware (first line of defense)
 if settings.app_env == "production":
     allowed_hosts = [
         "accuratea-production.up.railway.app",  # Railway domain
         "api.accuratea.com",  # custom domain
-        "accurate-a-web.vercel.app",  # Vercel domain
-        "accuratea.com",
         "www.accuratea.com",
+        "accuratea.com",
+        "accurate-a-web.vercel.app",  # Vercel domain
     ]
     app.add_middleware(
         TrustedHostMiddleware,
@@ -70,23 +73,19 @@ if settings.app_env == "production":
     )
     logger.info(f"Trusted hosts: {allowed_hosts}")
 
-# 2. Security Middleware (rate limiting, IP blocking)
+# Security Middleware (rate limiting, IP blocking)
 app.add_middleware(
     SecurityMiddleware,
     rate_limit=settings.rate_limit_per_minute
 )
 
+# Performance Middleware
 app.add_middleware(PerformanceMiddleware)
-
-
-# 3. CORS Middleware (cross-origin requests)
-configure_cors(app)
-
-# 4. GZip Compression (reduce bandwidth)
-app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-# 5. Request ID Middleware (for tracing)
+# GZip Compression (reduce bandwidth)
+app.add_middleware(GZipMiddleware, minimum_size=1000) # Compress responses > 1KB
+# Request ID Middleware (for tracing)
 app.add_middleware(RequestIDMiddleware)
+
 
 #Router
 app.include_router(auth.router)
@@ -106,8 +105,8 @@ app.include_router(assets.router)
 app.include_router(teabot.router)
 app.include_router(health.router)
 
-#Root Endpoints
 
+#Root Endpoints
 @app.get("/")
 def root():
     return {
@@ -145,9 +144,6 @@ async def shutdown():
 #     allow_methods=["*"],
 #     allow_headers=["*"]
 # )
-
-app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
-app.add_middleware(RequestIDMiddleware)
 
 
 

@@ -36,6 +36,10 @@ class SecurityMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         try:
+            # SKIP SECURITY CHECKS FOR OPTIONS (CORS PREFLIGHT)
+            if request.method == "OPTIONS":
+                return await call_next(request)
+
             client_ip = self._get_client_ip(request)
             path = request.url.path
 
