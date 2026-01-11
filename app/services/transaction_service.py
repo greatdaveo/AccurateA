@@ -43,7 +43,7 @@ class TransactionService:
                 self.classify_transaction(transaction)
 
                 # Create journal entry if classification is successful
-                if transaction.gl_account_id:
+                if transaction.gl_account_id and transaction.gl_account_id != "":
                     je_agent = JournalEntryAgent(self.db, self.company_id)
                     journal_entry = je_agent.create_entry_from_transaction(transaction)
 

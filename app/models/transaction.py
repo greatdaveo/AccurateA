@@ -248,14 +248,18 @@ class Transaction(BaseModel):
         self,
         db: Session,
         category: str,
-        account_id: str,
+        account_id: Optional[str],
         confidence: float,
         classified_by: str = "ai"
     ):
         """Mark transaction as classified by AI"""
 
         self.category = category
-        self.gl_account_id = account_id
+        if account_id and account_id.strip():
+            self.gl_account_id = account_id
+        else:
+            self.gl_account_id = None
+
         self.classification_confidence = confidence
         self.classified_by = classified_by
 

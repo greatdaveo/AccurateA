@@ -21,8 +21,8 @@ class ClassificationAgent(BaseAgent):
         self.vector_store = vector_store
 
     def classify_transaction(
-            self,
-            transaction: Transaction
+        self,
+        transaction: Transaction
     ) -> Dict[str, Any]:
         """Classify a transaction using AI & Historical patterns"""
 
