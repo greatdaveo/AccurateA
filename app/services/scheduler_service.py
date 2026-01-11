@@ -233,6 +233,8 @@ class SchedulerService:
 
     def email_monitoring_job(self):
         """Check Gmail and forwarding inboxes for new receipts"""
+        db = SessionLocal()
+
         try:
             # Monitor Gmail connections
             GmailService.monitor_all_gmail_connections(db)

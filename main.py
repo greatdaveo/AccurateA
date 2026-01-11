@@ -1,9 +1,13 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.middleware.request_id import RequestIDMiddleware
-# from fastapi.middleware.gzip import GZipMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
+from app.middleware.request_id import RequestIDMiddleware
+from app.middleware.security import SecurityMiddleware
+from app.middleware.cors_config import configure_cors
+from app.utils.logger import logger
 from app.config import settings
 from app.api import (
     auth,
@@ -31,8 +35,10 @@ import uvicorn
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """start scheduler on startup, stops on shutdown"""
+    logger.info("Starting AccurateA API")
     scheduler.start()
     yield
+    logger.info("Shutting down AccurateA API")
     scheduler.shutdown()
 
 app = FastAPI(
@@ -40,20 +46,45 @@ app = FastAPI(
     description="AI-Powered Accounting Automation Platform",
     version="0.1.0",
     debug=settings.debug,
+    lifespan=lifespan,
+    # Disable docs in production for security
+    docs_url="/docs" if settings.app_env == "development" else None,
+    redoc_url="/redoc" if settings.app_env == "development" else None,
+    openapi_url="/openapi.json" if settings.app_env == "development" else None,
 )
 
+# MIDDLEWARE CONFIGURATION
+# 1. Trusted Host Middleware (first line of defense)
+if settings.app_env == "production":
+    allowed_hosts = [
+        "accuratea-production.up.railway.app",  # Railway domain
+        "api.accuratea.com",  # custom domain
+        "accurate-a-web.vercel.app",  # Vercel domain
+        "accuratea.com",
+        "www.accuratea.com",
+    ]
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=allowed_hosts
+    )
+    logger.info(f"Trusted hosts: {allowed_hosts}")
+
+# 2. Security Middleware (rate limiting, IP blocking)
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
+    SecurityMiddleware,
+    rate_limit=settings.rate_limit_per_minute
 )
 
-# app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
+# 3. CORS Middleware (cross-origin requests)
+configure_cors(app)
+
+# 4. GZip Compression (reduce bandwidth)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# 5. Request ID Middleware (for tracing)
 app.add_middleware(RequestIDMiddleware)
 
-
+#Router
 app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(accounts.router)
@@ -71,6 +102,7 @@ app.include_router(assets.router)
 app.include_router(teabot.router)
 app.include_router(health.router)
 
+#Root Endpoints
 
 @app.get("/")
 def root():
@@ -84,20 +116,38 @@ def root():
 async def health_check():
     return {
         "status": "healthy",
-        "environment": settings.app_env
+        "environment": settings.app_env,
+        "version": "0.1.0"
     }
 
 @app.on_event("startup")
 async def startup_event():
-    print("=" * 50)
-    print(f"Starting {settings.app_name}")
-    print(f"Environment: {settings.app_env}")
-    print(f"Debug Mode: {settings.debug}")
-    print("=" * 50)
+     logger.info("=" * 50)
+     logger.info(f"Starting {settings.app_name}")
+     logger.info(f"Environment: {settings.app_env}")
+     logger.info(f"Debug Mode: {settings.debug}")
+     logger.info(f"Scheduler: Running")
+     logger.info("=" * 50)
 
 @app.on_event("shutdown")
 async def shutdown():
-    print(f"Shutting down {settings.app_name}")
+    logger.info(f"Shutting down {settings.app_name}")
+
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:5173"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"]
+# )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)  # Compress responses > 1KB
+app.add_middleware(RequestIDMiddleware)
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -105,5 +155,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True
+        reload=True,
+        log_level="info"
     )

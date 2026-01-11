@@ -1,20 +1,29 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from typing import Optional, List
 
 class Settings(BaseSettings):
     app_name: str = "AccurateA"
+
+    # Security Settings
     app_env: str = "development"
     debug: bool = True
 
+    cors_origins: List[str] = [
+        "http://localhost:5173",  # Local development
+        "http://localhost:3000",  # Alternative local
+    ]
+
+    # Production URLs
     frontend_url: str = "http://localhost:5173"
     backend_url: str = "http://localhost:8000"
 
     database_url: str
+
+    #Security
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 30
     openai_api_key: Optional[str] = None
-
 
     # Pinecone
     pinecone_api_key: Optional[str] = None
@@ -41,6 +50,12 @@ class Settings(BaseSettings):
 
     #Email Processing
     email_check_interval: int = 300  # 5 minutes
+
+    # Rate Limiting
+    rate_limit_per_minute: int = 60
+
+    # Trusted Hosts (for production)
+    trusted_hosts: List[str] = ["*"]  # restrict in production
 
     model_config = SettingsConfigDict(
         env_file=".env",
