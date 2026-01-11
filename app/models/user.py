@@ -51,6 +51,13 @@ class User(BaseModel):
         comment="Role: owner, admin, accountant, member, viewer"
     )
 
+    is_active = Column(
+        Boolean,
+        default=True,
+        nullable=False,
+        comment="Whether user account is active"
+    )
+
     email_verified_at = Column(
         DateTime,
         nullable=True,
@@ -99,7 +106,6 @@ class User(BaseModel):
     @classmethod
     def create(cls, db: Session, password_hash: str, **kwargs):
         """ Create a new user """
-
         user = cls(password_hash=password_hash, **kwargs)
         user.save(db)
 
@@ -127,6 +133,16 @@ class User(BaseModel):
     def can_manage_users(self):
         """Check if user can manage other users"""
         return self.role in ["owner", "admin"]
+
+    def deactivate(self, db: Session):
+        """Deactivate user account"""
+        self.is_active = False
+        self.update(db)
+
+    def activate(self, db: Session):
+        """Activate user account"""
+        self.is_active = True
+        self.update(db)
 
     @property
     def full_name(self) -> str:
