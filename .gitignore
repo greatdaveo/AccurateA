@@ -16,6 +16,7 @@ venv/
 *.db
 *.sqlite
 
+/create_missing_accounts.py
 
 # IDE
 .vscode/

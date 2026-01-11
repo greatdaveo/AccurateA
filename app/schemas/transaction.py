@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel, Field, ConfigDict, field_serializer
+from pydantic import BaseModel, Field, ConfigDict, field_serializer, validator
 from typing import Optional
 from datetime import date, datetime
 from uuid import UUID
@@ -149,9 +149,16 @@ class ClassificationResultSchema(BaseModel):
     """Schema for classification result"""
     category: str
     account_code: str
-    account_id: UUID
+    account_id: Optional[UUID]
     confidence: float
-    reasoning: str
+    reasoning: Optional[str]
+
+    @validator('account_id', pre=True)
+    def validate_account_id(cls, v):
+        """Convert empty string to None"""
+        if v == "" or v is None:
+            return None
+        return v
 
     class Config:
         json_schema_extra = {

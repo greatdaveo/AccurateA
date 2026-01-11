@@ -42,8 +42,8 @@ class TransactionService:
             try:
                 self.classify_transaction(transaction)
 
-                # Create journal entry if classification is successful
-                if transaction.gl_account_id and transaction.gl_account_id != "":
+                # Only create journal entry if account_id exists and is valid
+                if transaction.gl_account_id:
                     je_agent = JournalEntryAgent(self.db, self.company_id)
                     journal_entry = je_agent.create_entry_from_transaction(transaction)
 
@@ -69,6 +69,10 @@ class TransactionService:
                     except Exception as e:
                         print(f"Tax analysis failed: {e}")
 
+                else:
+                    print(f"Transaction {transaction.id} has no GL account - needs review")
+
+
             except Exception as e:
                 print(f"Failed to create journal entry: {e}")
                 traceback.print_exc()
@@ -83,11 +87,13 @@ class TransactionService:
         # classify
         result = agent.classify_transaction(transaction)
 
+        account_id = result.get("account_id")
+
         #Update transaction
         transaction.mark_as_classified(
             self.db,
             category=result["category"],
-            account_id=result["account_id"],
+            account_id=account_id, #Can be None
             confidence=result["confidence"],
             classified_by="ai"
         )

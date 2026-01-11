@@ -291,19 +291,31 @@ class ClassificationAgent(BaseAgent):
 
             if not account:
                 self.log(f"Account {result['account_code']} not found!")
-                # Try to find a reasonable default
-                default_account = self.db.query(Account).filter(
-                    Account.company_id == self.company_id,
-                    Account.account_type == "expense",
-                    Account.is_active == True
-                ).first()
+
+                # Try to get a default expense account
+                default_account = self._get_default_account()
 
                 if default_account:
                     self.log(f"Using default account: {default_account.account_code}")
-                    account = default_account
+                    return {
+                        "category": result["category"],
+                        "account_code": default_account.account_code,
+                        "account_id": str(default_account.id),
+                        "confidence": result["confidence"] * 0.7,  # Reduce confidence
+                        "reasoning": f"{result['reasoning']} (Using default account)"
+                    }
                 else:
-                    raise ValueError(f"Account {result['account_code']} not found and no default available")
+                    # No account found - return None for account_id
+                    self.log(f"No default account available")
+                    return {
+                        "category": "Unknown - Account Not Found",
+                        "account_code": result["account_code"],
+                        "account_id": None,  # Return None
+                        "confidence": 0.0,
+                        "reasoning": f"Account {result['account_code']} not found in chart of accounts"
+                    }
 
+            # Success - account found
             return {
                 "category": result["category"],
                 "account_code": result["account_code"],
@@ -317,22 +329,12 @@ class ClassificationAgent(BaseAgent):
             self.log(f"Content: {content}")
 
             # Return safe default with zero confidence
-            default_account = self.db.query(Account).filter(
-                Account.company_id == self.company_id,
-                Account.account_code == "6100"  # Office Expenses
-            ).first()
-
-            if not default_account:
-                # Fallback to any expense account
-                default_account = self.db.query(Account).filter(
-                    Account.company_id == self.company_id,
-                    Account.account_type == "expense"
-                ).first()
+            default_account = self._get_default_account()
 
             return {
-                "category": "Unknown - Needs Review",
-                "account_code": default_account.account_code if default_account else "6100",
-                "account_id": str(default_account.id) if default_account else "",
+                "category": "Unknown - Parse Error",
+                "account_code": default_account.account_code if default_account else "Unknown",
+                "account_id": str(default_account.id) if default_account else None,  # None
                 "confidence": 0.0,
                 "reasoning": f"AI response parsing failed: {str(e)}"
             }
@@ -343,18 +345,42 @@ class ClassificationAgent(BaseAgent):
             traceback.print_exc()
 
             # Return safe default
-            default_account = self.db.query(Account).filter(
-                Account.company_id == self.company_id,
-                Account.account_code == "6100"
-            ).first()
+            default_account = self._get_default_account()
 
             return {
                 "category": "Unknown - Error",
-                "account_code": default_account.account_code if default_account else "6100",
+                "account_code": default_account.account_code if default_account else "Unknown",
                 "account_id": str(default_account.id) if default_account else "",
                 "confidence": 0.0,
                 "reasoning": f"Classification error: {str(e)}"
             }
+
+    def _get_default_account(self) -> Optional[Account]:
+        """Get a default expense account as fallback"""
+
+        # Try common default codes
+        default_codes = ['6000', '5000', '6999', '5999', '7000']
+
+        for code in default_codes:
+            account = self.db.query(Account).filter(
+                Account.company_id == self.company_id,
+                Account.account_code == code,
+                Account.is_active == True,
+                Account.deleted_at.is_(None)
+            ).first()
+
+            if account:
+                return account
+
+        # Try any active expense account
+        account = self.db.query(Account).filter(
+            Account.company_id == self.company_id,
+            Account.account_type == "expense",
+            Account.is_active == True,
+            Account.deleted_at.is_(None)
+        ).first()
+
+        return account
 
     def classify_batch(
             self,
