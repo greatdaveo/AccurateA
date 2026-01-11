@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security import SecurityMiddleware
 from app.middleware.cors_config import configure_cors
+from app.middleware.performance_tracker import PerformanceMiddleware
 from app.utils.logger import logger
 from app.config import settings
 from app.api import (
@@ -74,6 +75,9 @@ app.add_middleware(
     SecurityMiddleware,
     rate_limit=settings.rate_limit_per_minute
 )
+
+app.add_middleware(PerformanceMiddleware)
+
 
 # 3. CORS Middleware (cross-origin requests)
 configure_cors(app)

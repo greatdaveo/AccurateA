@@ -15,6 +15,8 @@ from datetime import datetime
 from app.utils.database import get_db, engine
 from app.models.user import User
 from app.utils.security import require_admin
+from app.middleware.performance_tracker import performance_tracker
+
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/health", tags=["Health"])
@@ -425,4 +427,26 @@ async def performance_metrics(
 
     except Exception as e:
         logger.error(f"Failed to get metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/performance")
+async def performance_stats(
+        admin: User = Depends(require_admin)
+):
+    """
+    Application performance metrics - ADMIN ONLY
+    Response times, throughput, error rates, and request distribution
+    """
+    try:
+        stats = performance_tracker.get_stats()
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "performance": stats
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get performance stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
