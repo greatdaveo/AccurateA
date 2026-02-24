@@ -3,6 +3,7 @@ from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from app.models import Account, JournalEntry, JournalEntryLine
+from app.utils.logger import logger
 
 class TrialBalanceService:
     """This calculates account balances as of a specific date"""
@@ -56,15 +57,15 @@ class TrialBalanceService:
                 total_debits += debit
                 total_credits += credit
 
-                print(f"  {account.account_code} {account.account_name:30} "
+                logger.info(f"{account.account_code} {account.account_name:30} "
                       f"DR: ${debit:>10.2f}  CR: ${credit:>10.2f}")
 
         is_balanced = abs(total_debits - total_credits) < 0.01
 
         if is_balanced:
-            print("Trial Balance is BALANCED!")
+            logger.info("Trial Balance is BALANCED!")
         else:
-            print(f"WARNING: Trial Balance is OUT OF BALANCE by ${abs(total_debits - total_credits):.2f}")
+            logger.warning(f"WARNING: Trial Balance is OUT OF BALANCE by ${abs(total_debits - total_credits):.2f}")
 
         return {
             "as_of_date": str(as_of_date),

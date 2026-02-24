@@ -392,7 +392,7 @@ class ClassificationAgent(BaseAgent):
 
         for txn in transactions:
             try:
-                result = self.classify_transactions(txn)
+                result = self.classify_transaction(txn)
                 results.append({
                     "transaction_id": str(txn.id),
                     "classification": result

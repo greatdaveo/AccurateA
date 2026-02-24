@@ -188,7 +188,7 @@ class JournalEntry(BaseModel):
 
     def get_total_credits(self) -> Decimal:
         """Get total credits"""
-        return sum(line.debit for line in self.lines)
+        return sum(line.credit for line in self.lines)
 
     def post(self, db: Session, posted_by_id: str):
         """Post journal entry - This updates all account balances"""

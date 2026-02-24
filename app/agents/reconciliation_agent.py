@@ -265,7 +265,7 @@ class ReconciliationAgent(BaseAgent):
             If no good match (confidence < 0.85), return match_found: false.
         """
 
-def _build_matching_prompt(
+    def _build_matching_prompt(
         self,
         bank_txn: BankTransaction,
         candidates: List[Transaction]
@@ -293,7 +293,7 @@ def _build_matching_prompt(
         """
 
 
-def _parse_matching_response(self, response) -> Optional[Dict[str, Any]]:
+    def _parse_matching_response(self, response) -> Optional[Dict[str, Any]]:
     """Parse AI matching response"""
     try:
         content = response.choices[0].message.content
