@@ -9,6 +9,7 @@ from app.services.income_statement_service import IncomeStatementService
 from app.services.balance_sheet_service import BalanceSheetService
 from app.services.cash_flow_service import CashFlowService
 from app.agents.financial_statement_agent import FinancialStatementAgent
+from app.utils.security import require_permission
 
 
 router = APIRouter(
@@ -27,7 +28,7 @@ async def get_trial_balance(
             default=None,
             description="As of date (defaults to today)"
         ),
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(require_permission("view_reports")),
         db: Session = Depends(get_db)
 ):
     """The trial balance shows all account balances and verifies
@@ -55,7 +56,7 @@ async def get_income_statement(
             default=None,
             description="Period end date"
         ),
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(require_permission("view_reports")),
         db: Session = Depends(get_db)
 ):
     """Shows revenue, expenses, and net income for a period"""
@@ -81,7 +82,7 @@ async def get_balance_sheet(
             default=None,
             description="As of date (defaults to today)"
         ),
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(require_permission("view_reports")),
         db: Session = Depends(get_db)
 ):
     """Shows assets, liabilities, and equity as of a specific date"""
@@ -101,7 +102,7 @@ async def get_balance_sheet(
 async def get_cash_flow_statement(
     start_date: date = Query(...),
     end_date: date = Query(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("view_reports")),
     db: Session = Depends(get_db)
 ):
     """Get Cash Flow Statement"""
@@ -127,7 +128,7 @@ async def get_financial_summary(
             default=None,
             description="As of date (defaults to today)"
         ),
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(require_permission("view_reports")),
         db: Session = Depends(get_db)
 ):
     """Get comprehensive financial summary"""
@@ -185,7 +186,7 @@ async def get_financial_analysis(
         default=None,
         description="Period end date"
     ),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("view_reports")),
     db: Session = Depends(get_db)
 ):
     """Get AI-powered financial analysis with key insights"""

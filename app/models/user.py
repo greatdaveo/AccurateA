@@ -5,6 +5,7 @@ from typing import Optional
 from datetime import datetime
 from app.models.base import BaseModel
 
+
 class User(BaseModel):
     """ Each user belongs to a company """
 
@@ -46,9 +47,9 @@ class User(BaseModel):
 
     role = Column(
         String(50),
-        default="member",
+        default="bookkeeper",
         nullable=False,
-        comment="Role: owner, admin, accountant, member, viewer"
+        comment="Role: owner, admin, accountant, bookkeeper, viewer"
     )
 
     is_active = Column(
@@ -132,7 +133,8 @@ class User(BaseModel):
 
     def can_manage_users(self):
         """Check if user can manage other users"""
-        return self.role in ["owner", "admin"]
+        from app.utils.permissions import has_permission
+        return has_permission(self.role, "manage_users")
 
     def deactivate(self, db: Session):
         """Deactivate user account"""

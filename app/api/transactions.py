@@ -14,6 +14,7 @@ from app.schemas.transaction import (
     ClassificationCorrectionSchema
 )
 from app.services.audit_service import AuditService
+from app.utils.security import require_permission
 
 
 
@@ -123,7 +124,7 @@ async def classify_pending(service: TransactionService = Depends(get_transaction
 )
 async def get_transaction(
     transaction_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("view_transactions")),
     db: Session = Depends(get_db)
 ):
     """Get transaction by ID"""
@@ -180,7 +181,7 @@ async def classify_transaction(
 async def approve_classification(
     transaction_id: str,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("approve_transactions")),
     service: TransactionService = Depends(get_transaction_service)
 ):
     """Approve the AI classification"""
@@ -216,7 +217,7 @@ async def approve_classification(
 async def correct_classification(
     transaction_id: str,
     correction: ClassificationCorrectionSchema,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("edit_transactions")),
     service: TransactionService = Depends(get_transaction_service)
 ):
     """Correct the AI classification, this helps the AI learn from mistakes"""

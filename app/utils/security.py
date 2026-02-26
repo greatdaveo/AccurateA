@@ -10,6 +10,7 @@ from jose import JWTError, jwt
 from app.models.user import User
 from app.config import settings
 from app.utils.database import get_db
+from app.utils.permissions import has_permission, VALID_ROLES
 
 security = HTTPBearer()
 
@@ -208,6 +209,22 @@ async def require_owner(
             detail=f"Access denied. Owner role required. Your role: {current_user.role}"
         )
     return current_user
+
+def require_permission(permission: str):
+    """
+    Factory function that creates a FastAPI dependency to check permissions.
+    """
+    async def permission_checker(
+        current_user: User = Depends(get_current_active_user)
+    ) -> User:
+        if not has_permission(current_user.role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied. Your role '{current_user.role}' does not have '{permission}' permission."
+            )
+        return current_user
+
+    return permission_checker
 
 
 async def require_can_manage_users(

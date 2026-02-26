@@ -6,6 +6,7 @@ from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User, JournalEntry
 from app.services.audit_service import AuditService
+from app.utils.security import require_permission
 
 
 router = APIRouter(
@@ -50,7 +51,7 @@ class JournalEntryResponse(BaseModel):
 async def list_journal_entries(
     status: str = None,
     source: str = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("view_journals")),
     db: Session = Depends(get_db)
 ):
     """Get all journal entries for current company"""
@@ -101,7 +102,7 @@ async def list_journal_entries(
 )
 async def get_journal_entry(
     entry_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("view_journals")),
     db: Session = Depends(get_db)
 ):
     """Get a single journal entry"""
@@ -149,7 +150,7 @@ async def get_journal_entry(
 async def post_journal_entry(
     entry_id: str,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("post_journals")),
     db: Session = Depends(get_db)
 ):
     """Post a journal entry"""
@@ -215,7 +216,7 @@ async def post_journal_entry(
     description="Get all draft journal entries awaiting review"
 )
 async def get_draft_entries(
-        current_user: User = Depends(get_current_user),
+        current_user: User = Depends(require_permission("view_journals")),
         db: Session = Depends(get_db)
 ):
     """Get draft journal entries"""

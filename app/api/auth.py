@@ -13,6 +13,7 @@ from app.schemas.user import (
 )
 from app.models import User
 from app.services.audit_service import AuditService
+from app.utils.permissions import get_role_permissions, ROLE_DESCRIPTIONS
 
 
 router = APIRouter(
@@ -184,3 +185,24 @@ async def verify_email(
     auth_service.verify_email(current_user)
 
     return {"message": "Email verified successfully"}
+
+
+@router.get(
+    "/permissions",
+    summary="Get current user's permissions",
+    description="Returns the list of permissions for the current user's role"
+)
+async def get_my_permissions(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Returns permissions for the current user.
+    The frontend uses this to show/hide UI elements based on what the user can do.
+    """
+    permissions = get_role_permissions(current_user.role)
+
+    return {
+        "role": current_user.role,
+        "role_description": ROLE_DESCRIPTIONS.get(current_user.role, ""),
+        "permissions": permissions,
+    }
