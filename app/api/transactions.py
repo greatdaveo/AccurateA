@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import date
@@ -13,6 +13,8 @@ from app.schemas.transaction import (
     ClassificationResultSchema,
     ClassificationCorrectionSchema
 )
+from app.services.audit_service import AuditService
+
 
 
 router = APIRouter(
@@ -177,6 +179,7 @@ async def classify_transaction(
 )
 async def approve_classification(
     transaction_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     service: TransactionService = Depends(get_transaction_service)
 ):
@@ -185,6 +188,20 @@ async def approve_classification(
     transaction = service.approve_classification(
         transaction_id,
         str(current_user.id)
+    )
+
+    #Audit logs
+    audit = AuditService(db, request)
+    audit.log_action(
+        user=current_user,
+        action="approve",
+        entity_type="transaction",
+        entity_id=str(transaction.id),
+        description=f"Approved transaction: {transaction.counterparty_name} - £{transaction.amount}",
+        changes={
+            "is_reviewed": {"before": False, "after": True},
+            "category": transaction.category,
+        }
     )
 
     return TransactionResponseSchema.from_orm(transaction)

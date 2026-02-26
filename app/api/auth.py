@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.utils.database import get_db
@@ -12,6 +12,8 @@ from app.schemas.user import (
     RefreshTokenSchema
 )
 from app.models import User
+from app.services.audit_service import AuditService
+
 
 router = APIRouter(
     prefix="/auth",
@@ -63,9 +65,20 @@ async def register(
 )
 async def login(
     login_data: UserLoginSchema,
-    auth_service: AuthService = Depends(get_auth_service)
+    request: Request,
+    auth_service: AuthService = Depends(get_auth_service),
+    db: Session = Depends(get_db)
 ):
     user, tokens = auth_service.login_user(login_data)
+
+    audit = AuditService(db, request)
+    audit.log_action(
+        user=user,
+        action="login",
+        entity_type="user",
+        entity_id=str(user.id),
+        description=f"User logged in: {user.email}",
+    )
 
     # Prepare response
     user_response = UserResponseSchema.from_orm(user)

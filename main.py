@@ -26,7 +26,8 @@ from app.api import (
     dashboard,
     assets,
     teabot,
-    health
+    health,
+    audit
 )
 from app.services.scheduler_service import scheduler
 
@@ -104,7 +105,7 @@ app.include_router(dashboard.router)
 app.include_router(assets.router)
 app.include_router(teabot.router)
 app.include_router(health.router)
-
+app.include_router(audit.router)
 
 #Root Endpoints
 @app.get("/")

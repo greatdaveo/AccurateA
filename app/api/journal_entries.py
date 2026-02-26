@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List
+from pydantic import BaseModel
 from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User, JournalEntry
-from pydantic import BaseModel
+from app.services.audit_service import AuditService
+
 
 router = APIRouter(
     prefix="/journal-entries",
@@ -139,7 +141,6 @@ async def get_journal_entry(
     )
 
 
-
 @router.post(
     "/{entry_id}/post",
     summary="Post journal entry",
@@ -147,10 +148,12 @@ async def get_journal_entry(
 )
 async def post_journal_entry(
     entry_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Post a journal entry"""
+
     entry = db.query(JournalEntry).filter(
         JournalEntry.id == entry_id,
         JournalEntry.company_id == current_user.company_id,
@@ -177,6 +180,22 @@ async def post_journal_entry(
 
     try:
         entry.post(db, str(current_user.id))
+
+        #Audit Log
+        audit = AuditService(db, request)
+        audit.log_action(
+            user=current_user,
+            action="post",
+            entity_type="journal_entry",
+            entity_id=str(entry.id),
+            description=f"Posted journal entry {entry.entry_number}: {entry.description}",
+            changes={
+                "status": {"before": "draft", "after": "posted"},
+                "total_debits": float(entry.get_total_debits()),
+                "total_credits": float(entry.get_total_credits()),
+            }
+        )
+
         return {
             "success": True,
             "message": "Journal entry posted successfully",

@@ -13,6 +13,7 @@ from app.models.plaid_item import PlaidItem
 from app.models.email_connection import EmailConnection
 from app.models.asset import Asset
 from app.models.refresh_token import RefreshToken
+from app.models.audit_log import AuditLog
 
 
 #Export all models
@@ -32,6 +33,7 @@ __all__ = [
     "PlaidItem",
     "EmailConnection",
     "Asset",
-    "RefreshToken"
+    "RefreshToken",
+    "AuditLog"
 ]
 
