@@ -24,7 +24,7 @@ class TaxCategoryResponse(BaseModel):
     tax_form: Optional[str] = None
     tax_line: Optional[str] = None
     requires_receipt: bool
-    irs_notes: Optional[str] = None
+    tax_notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -41,7 +41,7 @@ async def setup_tax_categories(
 ):
     """
     Set up default tax categories
-    Creates IRS-compliant tax categories for expense classification.
+    Creates tax categories for expense classification.
     """
 
     service = TaxService(db, str(current_user.company_id))
@@ -80,7 +80,7 @@ async def get_tax_categories(
             tax_form=cat.tax_form,
             tax_line=cat.tax_line,
             requires_receipt=cat.requires_receipt,
-            irs_notes=cat.irs_notes
+            tax_notes=cat.tax_notes
         )
         for cat in categories
     ]
@@ -98,7 +98,7 @@ async def analyze_transaction_tax(
 ):
     """
     Analyze transaction for tax compliance
-    AI determines: Tax category, Deductibility, Required documentation, IRS compliance notes
+    AI determines: Tax category, Deductibility, Required documentation, Tax compliance notes
     """
     service = TaxService(db, str(current_user.company_id))
 
@@ -146,7 +146,7 @@ async def get_tax_report(
 ):
     """
     Generate tax report,
-    Showing: Total expenses by tax category, Deductible amounts, Estimated tax savings, IRS compliance notes
+    Showing: Total expenses by tax category, Deductible amounts, Estimated tax savings, Tax compliance notes
     """
     service = TaxService(db, str(current_user.company_id))
     report = service.generate_tax_report(tax_year)

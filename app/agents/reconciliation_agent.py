@@ -294,36 +294,36 @@ class ReconciliationAgent(BaseAgent):
 
 
     def _parse_matching_response(self, response) -> Optional[Dict[str, Any]]:
-    """Parse AI matching response"""
-    try:
-        content = response.choices[0].message.content
+        """Parse AI matching response"""
+        try:
+            content = response.choices[0].message.content
 
-        # Extract JSON
-        if "```json" in content:
-            start = content.find("```json") + 7
-            end = content.find("```", start)
-            json_str = content[start:end].strip()
-        elif "```" in content:
-            start = content.find("```") + 3
-            end = content.find("```", start)
-            json_str = content[start:end].strip()
-        else:
-            json_str = content.strip()
+            # Extract JSON
+            if "```json" in content:
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                json_str = content[start:end].strip()
+            elif "```" in content:
+                start = content.find("```") + 3
+                end = content.find("```", start)
+                json_str = content[start:end].strip()
+            else:
+                json_str = content.strip()
 
-        result = json.loads(json_str)
+            result = json.loads(json_str)
 
-        if result.get('match_found') and result.get('transaction_id'):
-            return {
-                "transaction_id": result['transaction_id'],
-                "confidence": result['confidence'],
-                "method": "ai"
-            }
+            if result.get('match_found') and result.get('transaction_id'):
+                return {
+                    "transaction_id": result['transaction_id'],
+                    "confidence": result['confidence'],
+                    "method": "ai"
+                }
 
-        return None
+            return None
 
-    except Exception as e:
-        self.log(f"Failed to parse AI response: {e}")
-        return None
+        except Exception as e:
+            self.log(f"Failed to parse AI response: {e}")
+            return None
 
 
 

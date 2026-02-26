@@ -75,10 +75,10 @@ class TaxCategory(BaseModel):
         comment="Max amount without receipt (e.g., $75 for meals)"
     )
 
-    irs_notes = Column(
+    tax_notes = Column(
         Text,
         nullable=True,
-        comment="IRS guidelines for this category"
+        comment="Tax guidelines for this category"
     )
 
     company = relationship("Company", backref="tax_categories")
@@ -97,7 +97,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "8",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Business advertising and marketing costs"
+                "tax_notes": "Business advertising and marketing costs"
             },
             {
                 "name": "Office Expenses",
@@ -107,7 +107,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "18",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Office supplies, postage, etc."
+                "tax_notes": "Office supplies, postage, etc."
             },
             {
                 "name": "Business Meals",
@@ -118,7 +118,7 @@ class TaxCategory(BaseModel):
                 "requires_receipt": True,
                 "requires_documentation": False,
                 "max_amount_without_receipt": 75.00,
-                "irs_notes": "Business meals are 50% deductible. Must have business purpose."
+                "tax_notes": "Business meals are 50% deductible. Must have business purpose."
             },
             {
                 "name": "Travel",
@@ -128,7 +128,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "24a",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Business travel expenses. Must document business purpose."
+                "tax_notes": "Business travel expenses. Must document business purpose."
             },
             {
                 "name": "Software & Subscriptions",
@@ -138,7 +138,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "18",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Business software and online services"
+                "tax_notes": "Business software and online services"
             },
             {
                 "name": "Professional Services",
@@ -148,7 +148,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "17",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Legal, accounting, consulting fees"
+                "tax_notes": "Legal, accounting, consulting fees"
             },
             {
                 "name": "Utilities",
@@ -158,7 +158,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "25",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Business portion of utilities"
+                "tax_notes": "Business portion of utilities"
             },
             {
                 "name": "Entertainment",
@@ -166,7 +166,7 @@ class TaxCategory(BaseModel):
                 "deduction_percentage": 0.00,  # Not deductible!
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Entertainment expenses are generally NOT deductible (post-2017)"
+                "tax_notes": "Entertainment expenses are generally NOT deductible (post-2017)"
             },
             {
                 "name": "Personal Expenses",
@@ -174,7 +174,7 @@ class TaxCategory(BaseModel):
                 "deduction_percentage": 0.00,
                 "requires_receipt": False,
                 "requires_documentation": False,
-                "irs_notes": "Personal expenses are not deductible"
+                "tax_notes": "Personal expenses are not deductible"
             },
             {
                 "name": "Cloud Infrastructure",
@@ -184,7 +184,7 @@ class TaxCategory(BaseModel):
                 "tax_line": "18",
                 "requires_receipt": True,
                 "requires_documentation": False,
-                "irs_notes": "Cloud hosting and infrastructure costs"
+                "tax_notes": "Cloud hosting and infrastructure costs"
             },
         ]
 

@@ -58,7 +58,7 @@ class TaxComplianceAgent(BaseAgent):
         """System prompt for tax compliance"""
 
         categories_text = "\n".join([
-            f"- {cat.name}: {cat.deduction_percentage}% deductible, {cat.irs_notes or 'N/A'}"
+            f"- {cat.name}: {cat.deduction_percentage}% deductible, {cat.tax_notes or 'N/A'}"
             for cat in self.tax_categories
         ])
 
@@ -86,7 +86,7 @@ class TaxComplianceAgent(BaseAgent):
                     "deductible_amount": calculated amount,
                     "requires_receipt": true/false,
                     "requires_documentation": true/false,
-                    "irs_notes": "Brief explanation of tax treatment",
+                    "tax_notes": "Brief explanation of tax treatment",
                     "warnings": [
                         "Any red flags or concerns"
                     ],
