@@ -41,7 +41,7 @@ class JWTTokenService:
         self,
         secret_key: str,
         algorithm: str = "HS256",
-        access_token_expire_minutes: int = 60 * 24 * 30
+        access_token_expire_minutes: int = 60
     ):
         self.secret_key = secret_key
         self.algorithm = algorithm
@@ -59,12 +59,33 @@ class JWTTokenService:
             expire = datetime.utcnow() + expires_delta
         else:
             expire = datetime.utcnow() + timedelta(
-                days=self.access_token_expire_minutes
+                minutes=self.access_token_expire_minutes
             )
 
         to_encode.update({
             "exp": expire,
-            "iat": datetime.utcnow()
+            "iat": datetime.utcnow(),
+            "type": "access"
+        })
+
+        encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
+
+        return encoded_jwt
+
+    def create_refresh_token(
+        self,
+        data: Dict[str, Any],
+        expires_days: int = 7
+    ) -> str:
+        """Create JWT Refresh Token - longer lived, used only to get new tokens"""
+        to_encode = data.copy()
+
+        expire = datetime.utcnow() + timedelta(days=expires_days)
+
+        to_encode.update({
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "type": "refresh"
         })
 
         encoded_jwt = jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)

@@ -12,6 +12,7 @@ from app.models.anomaly import Anomaly
 from app.models.plaid_item import PlaidItem
 from app.models.email_connection import EmailConnection
 from app.models.asset import Asset
+from app.models.refresh_token import RefreshToken
 
 
 #Export all models
@@ -30,6 +31,7 @@ __all__ = [
     "Anomaly",
     "PlaidItem",
     "EmailConnection",
-    "Asset"
+    "Asset",
+    "RefreshToken"
 ]
 

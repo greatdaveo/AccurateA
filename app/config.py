@@ -22,7 +22,9 @@ class Settings(BaseSettings):
     #Security
     secret_key: str
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60 * 24 * 30
+    access_token_expire_minutes: int = 60
+    refresh_token_expired_days: int = 7
+
     openai_api_key: Optional[str] = None
 
     # Pinecone

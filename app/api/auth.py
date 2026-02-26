@@ -8,7 +8,8 @@ from app.schemas.user import (
     UserLoginSchema,
     UserResponseSchema,
     TokenResponseSchema,
-    PasswordChangeSchema
+    PasswordChangeSchema,
+    RefreshTokenSchema
 )
 from app.models import User
 
@@ -40,14 +41,15 @@ async def register(
     user_data: UserRegistrationSchema,
     auth_service: AuthService = Depends(get_auth_service)
 ):
-    user, company, token = auth_service.register_user(user_data)
+    user, company, tokens = auth_service.register_user(user_data)
 
     # Prepare response
     user_response = UserResponseSchema.from_orm(user)
     user_response.full_name = user.full_name
 
     return TokenResponseSchema(
-        access_token=token,
+        access_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
         token_type="bearer",
         user=user_response
     )
@@ -63,17 +65,63 @@ async def login(
     login_data: UserLoginSchema,
     auth_service: AuthService = Depends(get_auth_service)
 ):
-    user, token = auth_service.login_user(login_data)
+    user, tokens = auth_service.login_user(login_data)
 
     # Prepare response
     user_response = UserResponseSchema.from_orm(user)
     user_response.full_name = user.full_name
 
     return TokenResponseSchema(
-        access_token=token,
+        access_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
         token_type="bearer",
         user=user_response
     )
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponseSchema,
+    summary="Refresh tokens",
+    description="Exchange a refresh token for a new access + refresh token pair"
+)
+async def refresh_tokens(
+    body: RefreshTokenSchema,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Token refresh
+    - Accepts a valid refresh token
+    - Returns new access_token + refresh_token
+    - Revokes the old refresh token (rotation)
+    """
+    user, tokens = auth_service.refresh_tokens(body.refresh_token)
+    user_response = UserResponseSchema.from_orm(user)
+    user_response.full_name = user.full_name
+    return TokenResponseSchema(
+        access_token=tokens["access_token"],
+        refresh_token=tokens["refresh_token"],
+        token_type="bearer",
+        user=user_response
+    )
+
+
+@router.post(
+    "/logout",
+    status_code=status.HTTP_200_OK,
+    summary="Logout",
+    description="Revoke refresh token to end the session"
+)
+async def logout(
+    body: RefreshTokenSchema,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    """
+    Logout by revoking the refresh token.
+    The access token will expire naturally (1 hour).
+    """
+    auth_service.logout(body.refresh_token)
+    return {"message": "Logged out successfully"}
 
 
 @router.get(

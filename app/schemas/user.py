@@ -159,8 +159,9 @@ class UserResponseSchema(BaseModel):
 
 
 class TokenResponseSchema(BaseModel):
-    """Schema for token response (after login)"""
-    access_token: str = Field(..., description="JWT access token")
+    """Schema for token response (after login, register and refresh)"""
+    access_token: str = Field(..., description="JWT access token (short-lived)")
+    refresh_token: str = Field(..., description="JWT refresh token (long-lived)")
     token_type: str = Field(default="bearer", description="Token type")
     user: UserResponseSchema = Field(..., description="User information")
 
@@ -168,6 +169,7 @@ class TokenResponseSchema(BaseModel):
         json_schema_extra = {
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
                 "user": {
                     "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -180,6 +182,11 @@ class TokenResponseSchema(BaseModel):
         }
 
 
+class RefreshTokenSchema(BaseModel):
+    """Schema for token refresh request"""
+    refresh_token: str = Field(..., description="The refresh token to exchange for new tokens")
+
+
 # Export all schemas
 __all__ = [
     "UserRegistrationSchema",
@@ -188,4 +195,5 @@ __all__ = [
     "PasswordChangeSchema",
     "UserResponseSchema",
     "TokenResponseSchema",
+    "RefreshTokenSchema"
 ]
