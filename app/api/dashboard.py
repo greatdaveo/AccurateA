@@ -2,10 +2,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date as date_type
 from typing import Optional
+from sqlalchemy import func
 
 from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User, Transaction, Account
+from app.models.anomaly import Anomaly
+from app.models.bank_transaction import BankTransaction
 
 router = APIRouter(
     prefix="/dashboard",
@@ -272,3 +275,50 @@ async def get_dashboard_summary(
         #     'expense_count': len(expense_txns),
         # }
     }
+
+@router.get(
+    "/badge-counts",
+    summary="Get badge counts for sidebar",
+    description="Lightweight endpoint returning counts of items needing attention"
+)
+async def get_badge_counts(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns counts for sidebar badge indicators.
+    This is lightweight — just COUNT queries, no data loading.
+    Called every 60 seconds by the frontend.
+    """
+
+    company_id = str(current_user.company_id)
+
+    #Count transactions that need human review
+    transactions_review = db.query(func.count(Transaction.id)).filter(
+        Transaction.company_id == company_id,
+        Transaction.classification_status == "needs_review",
+        Transaction.deleted_at.is_(None)
+    ).scalar() or 0
+
+    # Count pending anomalies
+    anomalies_pending = db.query(func.count(Anomaly.id)).filter(
+        Anomaly.company_id == company_id,
+        Anomaly.status == "pending",
+        Anomaly.deleted_at.is_(None)
+    ).scalar() or 0
+
+    # Count unreconciled bank transactions
+    unreconciled = db.query(func.count(BankTransaction.id)).filter(
+        BankTransaction.company_id == company_id,
+        BankTransaction.is_reconciled == False,
+        BankTransaction.deleted_at.is_(None)
+    ).scalar() or 0
+
+    return {
+        "transactions_review": transactions_review,
+        "anomalies_pending": anomalies_pending,
+        "unreconciled": unreconciled,
+        "total": transactions_review + anomalies_pending + unreconciled,
+    }
+
+
