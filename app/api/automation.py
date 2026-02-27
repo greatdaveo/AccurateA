@@ -10,6 +10,8 @@ from app.agents.classification_agent import ClassificationAgent
 from app.services.reconciliation_service import ReconciliationService
 from app.services.anomaly_service import AnomalyService
 from app.services.tax_service import TaxService
+from app.agents.vat_agent import VATAgent
+
 
 router = APIRouter(
     prefix="/automation",
@@ -120,6 +122,52 @@ async def classify_pending(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post(
+    "/classify-vat",
+    summary="Classify VAT on transactions",
+    description="Run AI VAT classification on all transactions missing VAT data"
+)
+async def classify_vat_pending(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Classify VAT on all transactions that haven't been VAT-classified yet."""
+    try:
+        # Find transactions without VAT classification
+        pending = db.query(Transaction).filter(
+            Transaction.company_id == current_user.company_id,
+            Transaction.vat_rate_id.is_(None),
+            Transaction.deleted_at.is_(None)
+        ).all()
+
+        if not pending:
+            return {
+                'success': True,
+                'total': 0,
+                'classified': 0,
+                'message': 'No transactions need VAT classification'
+            }
+
+        agent = VATAgent(db, str(current_user.company_id))
+        results = agent.classify_batch(pending)
+
+        return {
+            'success': True,
+            'total': results['total'],
+            'classified': results['classified'],
+            'errors': results['errors'],
+            'by_rate': results['by_rate'],
+            'message': f"VAT-classified {results['classified']}/{results['total']} transactions"
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 
 
 @router.post(

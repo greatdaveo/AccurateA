@@ -1,0 +1,330 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+from typing import Optional, List
+from pydantic import BaseModel, Field
+from datetime import date, datetime
+from decimal import Decimal
+
+from app.utils.database import get_db
+from app.api.auth import get_current_user
+from app.models import User
+from app.models.vat import VATRate, VATScheme, VATReturn
+from app.services.vat_service import VATService
+
+
+router = APIRouter(
+    prefix="/vat",
+    tags=["VAT"]
+)
+
+
+# RESPONSE SCHEMAS
+class VATRateResponse(BaseModel):
+    id: str
+    name: str
+    rate: Optional[float] = None
+    description: Optional[str] = None
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class VATReturnResponse(BaseModel):
+    id: str
+    company_id: str
+    period_start: date
+    period_end: date
+    box1_vat_due_sales: float
+    box2_vat_due_acquisitions: float
+    box3_total_vat_due: float
+    box4_vat_reclaimed: float
+    box5_net_vat: float
+    box6_total_sales_excl_vat: float
+    box7_total_purchases_excl_vat: float
+    box8_total_supplies_eu: float
+    box9_total_acquisitions_eu: float
+    status: str
+    notes: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    hmrc_receipt_id: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class VATReturnCreateRequest(BaseModel):
+    period_start: date = Field(..., description="Start of VAT period")
+    period_end: date = Field(..., description="End of VAT period")
+    notes: Optional[str] = Field(None, description="Internal notes")
+    finalise: bool = Field(
+        False,
+        description="If true, mark as 'submitted' (cannot be regenerated). If false, save as draft."
+    )
+
+
+# ENDPOINTS
+@router.get(
+    "/rates",
+    response_model=List[VATRateResponse],
+    summary="List VAT rates",
+    description="Get all active UK VAT rates (Standard 20%, Reduced 5%, Zero, Exempt, Outside Scope)"
+)
+async def list_vat_rates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all active VAT rates."""
+    rates = VATRate.get_active_rates(db)
+
+    if not rates:
+        # Auto-seed if no rates exist yet
+        VATRate.seed_uk_rates(db)
+        rates = VATRate.get_active_rates(db)
+
+    return rates
+
+
+@router.get(
+    "/summary",
+    summary="VAT summary for dashboard",
+    description="Get a high-level VAT overview for the current quarter"
+)
+async def get_vat_summary(
+    period_start: Optional[date] = Query(
+        None,
+        description="Start of period (defaults to current quarter start)"
+    ),
+    period_end: Optional[date] = Query(
+        None,
+        description="End of period (defaults to current quarter end)"
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get VAT summary for the dashboard.
+    If no dates provided, defaults to the current VAT quarter.
+    """
+    # Default to current quarter
+    if not period_start or not period_end:
+        today = date.today()
+        quarter_month = ((today.month - 1) // 3) * 3 + 1
+        period_start = date(today.year, quarter_month, 1)
+
+        # End of quarter
+        end_month = quarter_month + 2
+        end_year = today.year
+        if end_month > 12:
+            end_month -= 12
+            end_year += 1
+
+        if end_month in (1, 3, 5, 7, 8, 10, 12):
+            last_day = 31
+        elif end_month in (4, 6, 9, 11):
+            last_day = 30
+        else:
+            last_day = 29 if end_year % 4 == 0 else 28
+
+        period_end = date(end_year, end_month, last_day)
+
+    service = VATService(db)
+    return service.get_vat_summary(
+        company_id=str(current_user.company_id),
+        period_start=period_start,
+        period_end=period_end,
+    )
+
+
+@router.get(
+    "/returns",
+    response_model=List[VATReturnResponse],
+    summary="List VAT returns",
+    description="Get all VAT returns for the company, newest first"
+)
+async def list_vat_returns(
+    status_filter: Optional[str] = Query(
+        None,
+        alias="status",
+        description="Filter by status: draft, submitted, accepted, rejected"
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List all VAT returns for the company."""
+    returns = VATReturn.get_for_company(
+        db,
+        str(current_user.company_id),
+        status=status_filter,
+    )
+    return returns
+
+
+@router.get(
+    "/returns/draft",
+    response_model=VATReturnResponse,
+    summary="Generate draft VAT return",
+    description="Calculate a draft VAT return for a given period without saving it"
+)
+async def generate_draft_return(
+    period_start: date = Query(..., description="Start of VAT period"),
+    period_end: date = Query(..., description="End of VAT period"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Generate a draft VAT return for preview.
+
+    This calculates all 9 boxes from transaction data but does NOT save it.
+    Use POST /vat/returns to save or finalise.
+    """
+    if period_end <= period_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="period_end must be after period_start"
+        )
+
+    service = VATService(db)
+
+    try:
+        vat_return = service.generate_vat_return(
+            company_id=str(current_user.company_id),
+            period_start=period_start,
+            period_end=period_end,
+            save_draft=False,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
+
+    # Return as dict since it's not saved (no id yet)
+    return {
+        "id": str(vat_return.id) if vat_return.id else "preview",
+        "company_id": str(current_user.company_id),
+        "period_start": period_start,
+        "period_end": period_end,
+        "box1_vat_due_sales": float(vat_return.box1_vat_due_sales or 0),
+        "box2_vat_due_acquisitions": float(vat_return.box2_vat_due_acquisitions or 0),
+        "box3_total_vat_due": float(vat_return.box3_total_vat_due or 0),
+        "box4_vat_reclaimed": float(vat_return.box4_vat_reclaimed or 0),
+        "box5_net_vat": float(vat_return.box5_net_vat or 0),
+        "box6_total_sales_excl_vat": float(vat_return.box6_total_sales_excl_vat or 0),
+        "box7_total_purchases_excl_vat": float(vat_return.box7_total_purchases_excl_vat or 0),
+        "box8_total_supplies_eu": float(vat_return.box8_total_supplies_eu or 0),
+        "box9_total_acquisitions_eu": float(vat_return.box9_total_acquisitions_eu or 0),
+        "status": "draft",
+        "notes": None,
+        "submitted_at": None,
+        "hmrc_receipt_id": None,
+        "created_at": datetime.utcnow(),
+    }
+
+
+@router.post(
+    "/returns",
+    response_model=VATReturnResponse,
+    summary="Save or finalise a VAT return",
+    description="Generate and save a VAT return. Set finalise=true to mark as submitted."
+)
+async def save_vat_return(
+    request: VATReturnCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Save a VAT return.
+
+    - finalise=false -> saves as draft (can be regenerated)
+    - finalise=true -> marks as submitted (locked, cannot regenerate)
+    """
+    # Only admin/owner/accountant can submit returns
+    if current_user.role not in ["owner", "admin", "accountant"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners, admins, and accountants can save VAT returns"
+        )
+
+    if request.period_end <= request.period_start:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="period_end must be after period_start"
+        )
+
+    service = VATService(db)
+
+    try:
+        vat_return = service.generate_vat_return(
+            company_id=str(current_user.company_id),
+            period_start=request.period_start,
+            period_end=request.period_end,
+            save_draft=True,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(e)
+        )
+
+    # Add notes if provided
+    if request.notes:
+        vat_return.notes = request.notes
+
+    # Finalise if requested
+    if request.finalise:
+        vat_return.status = "submitted"
+        vat_return.submitted_at = datetime.utcnow()
+        vat_return.submitted_by_id = current_user.id
+
+    vat_return.update(db)
+
+    return vat_return
+
+
+@router.get(
+    "/returns/{return_id}",
+    response_model=VATReturnResponse,
+    summary="Get a specific VAT return",
+    description="Retrieve a VAT return by ID"
+)
+async def get_vat_return(
+    return_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get a specific VAT return."""
+    vat_return = db.query(VATReturn).filter(
+        VATReturn.id == return_id,
+        VATReturn.company_id == current_user.company_id,
+        VATReturn.deleted_at.is_(None),
+    ).first()
+
+    if not vat_return:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="VAT return not found"
+        )
+
+    return vat_return
+
+
+@router.get(
+    "/breakdown",
+    summary="VAT breakdown by rate",
+    description="Get VAT totals broken down by rate (Standard, Reduced, Zero, etc.)"
+)
+async def get_vat_breakdown(
+    period_start: date = Query(..., description="Start of period"),
+    period_end: date = Query(..., description="End of period"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get VAT breakdown by rate for a period."""
+    service = VATService(db)
+    return service.get_vat_breakdown_by_rate(
+        company_id=str(current_user.company_id),
+        period_start=period_start,
+        period_end=period_end,
+    )
