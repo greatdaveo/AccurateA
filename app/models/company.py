@@ -50,7 +50,7 @@ class Company(BaseModel):
 
     base_currency = Column(
         String(3),
-        default="USD",
+        default="GBP",
         nullable=False,
         comment="Base currency code (USD, EUR, etc)"
     )

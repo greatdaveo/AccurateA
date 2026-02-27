@@ -116,10 +116,10 @@ async def get_dashboard_summary(
     for txn in current_txns:
         if is_expense_transaction(txn):
             expense_txns.append(txn)
-            print(f"EXPENSE: {txn.counterparty_name} - ${txn.amount:,.2f} [{txn.category}]")
+            # print(f"EXPENSE: {txn.counterparty_name} - {txn.amount:,.2f} [{txn.category}]")
         else:
             revenue_txns.append(txn)
-            print(f"REVENUE: {txn.counterparty_name} - ${txn.amount:,.2f} [{txn.category}]")
+            # print(f"REVENUE: {txn.counterparty_name} - {txn.amount:,.2f} [{txn.category}]")
 
     # Calculate totals (all amounts are absolute values)
     current_revenue = sum(abs(txn.amount) for txn in revenue_txns)

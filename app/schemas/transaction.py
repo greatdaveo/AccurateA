@@ -16,7 +16,7 @@ class TransactionCreateSchema(BaseModel):
     )
 
     currency: str = Field(
-        default="USD",
+        default="GBP",
         max_length=3,
         description="Currency code"
     )
@@ -50,7 +50,7 @@ class TransactionCreateSchema(BaseModel):
             "example": {
                 "transaction_date": "2025-12-17",
                 "amount": 150.00,
-                "currency": "USD",
+                "currency": "GBP",
                 "counterparty_name": "DigitalOcean",
                 "description": "Cloud hosting services",
                 "source_type": "manual"
@@ -134,7 +134,7 @@ class TransactionResponseSchema(BaseModel):
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "transaction_date": "2025-12-17",
                 "amount": 150.00,
-                "currency": "USD",
+                "currency": "GBP",
                 "counterparty_name": "DigitalOcean",
                 "description": "Cloud hosting",
                 "category": "Cloud Infrastructure",

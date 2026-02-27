@@ -30,7 +30,7 @@ def seed_database():
             name="AccurateA Demo Corp",
             industry="SaaS",
             accounting_standard="GAAP",
-            base_currency="USD"
+            base_currency="GBP"
         )
         print(f"Created company: {company.name}")
 

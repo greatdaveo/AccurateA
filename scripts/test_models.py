@@ -18,7 +18,7 @@ def test_models():
             legal_name="Test Company Incorporated",
             industry="SaaS",
             accounting_standard="GAAP",
-            base_currency="USD"
+            base_currency="GBP"
         )
 
         print(f"Company Data: {company}")

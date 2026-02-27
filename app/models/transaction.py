@@ -47,7 +47,7 @@ class Transaction(BaseModel):
 
     currency = Column(
         String(3),
-        default="USD",
+        default="GBP",
         nullable=False,
         comment="Currency code (USD, EUR, GBP, etc)"
     )
