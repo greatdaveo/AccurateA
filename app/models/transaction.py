@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Date, Numeric, Boolean, Text, ForeignKey
+from sqlalchemy import Column, String, Date, Numeric, Boolean, Text, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, Session
 from typing import Optional, List
@@ -114,6 +114,44 @@ class Transaction(BaseModel):
         comment="Tax year (YYYY)"
     )
 
+    #VAT Fields
+    vat_rate_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("vat_rates.id"),
+        nullable=True,
+        comment="Which VAT rate applies (Standard 20%, Reduced 5%, Zero, Exempt, etc.)"
+    )
+
+    vat_amount = Column(
+        Numeric(15, 2),
+        nullable=True,
+        comment="VAT amount in currency (e.g., 30.00 on a £150 + VAT purchase)"
+    )
+
+    net_amount = Column(
+        Numeric(15, 2),
+        nullable=True,
+        comment="Amount excluding VAT (e.g., 150.00)"
+    )
+
+    gross_amount = Column(
+        Numeric(15, 2),
+        nullable=True,
+        comment="Amount including VAT (e.g., 180.00)"
+    )
+
+    vat_type = Column(
+        String(10),
+        nullable=True,
+        comment="'input' (purchases — reclaimable) or 'output' (sales — payable to HMRC)"
+    )
+
+    vat_inclusive = Column(
+        Boolean,
+        nullable=True,
+        comment="Was the original transaction amount VAT-inclusive? True = gross, False = net"
+    )
+
     classification_status = Column(
         String(20),
         default="pending",
@@ -132,13 +170,6 @@ class Transaction(BaseModel):
         nullable=True,
         comment="Who classified: ai, user, rule"
     )
-
-    # journal_entry_id = Column(
-    #     UUID(as_uuid=True),
-    #     ForeignKey("journal_entries.id", ondelete="SET NULL"),
-    #     nullable=True,
-    #     comment="Linked journal entry (if posted)"
-    # )
 
     status = Column(
         String(20),
@@ -163,6 +194,7 @@ class Transaction(BaseModel):
     #Relationships
     company = relationship("Company", backref="transactions")
     gl_account = relationship("Account", backref="transactions")
+    vat_rate = relationship("VATRate", backref="transactions")
     tax_category = relationship("TaxCategory", backref="transactions")
     reviewed_by = relationship("User", backref="reviewed_transactions")
 

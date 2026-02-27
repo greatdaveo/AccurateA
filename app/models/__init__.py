@@ -14,6 +14,7 @@ from app.models.email_connection import EmailConnection
 from app.models.asset import Asset
 from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
+from app.models.vat import VATRate, VATScheme, VATReturn
 
 
 #Export all models
@@ -34,6 +35,9 @@ __all__ = [
     "EmailConnection",
     "Asset",
     "RefreshToken",
-    "AuditLog"
+    "AuditLog",
+    "VATRate",
+    "VATScheme",
+    "VATReturn"
 ]
 
