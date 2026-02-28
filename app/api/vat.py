@@ -8,6 +8,7 @@ from decimal import Decimal
 from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User
+from app.models.transaction import Transaction
 from app.models.vat import VATRate, VATScheme, VATReturn
 from app.services.vat_service import VATService
 
@@ -281,6 +282,156 @@ async def save_vat_return(
     vat_return.update(db)
 
     return vat_return
+
+
+@router.get(
+    "/returns/drill",
+    summary="Drill into a VAT return box",
+    description="Get the transactions that feed into a specific VAT return box"
+)
+async def drill_into_box(
+    box: int = Query(..., ge=1, le=9, description="Box number (1-9)"),
+    period_start: date = Query(..., description="Start of VAT period"),
+    period_end: date = Query(..., description="End of VAT period"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Drill into a specific VAT return box to see underlying transactions.
+
+    Box mapping:
+    - Box 1: Output VAT (sales) → transactions where vat_type='output', shows vat_amount
+    - Box 2: EU acquisitions / reverse charge → currently minimal post-Brexit
+    - Box 3: Total VAT due (Box 1 + 2) → shows same as Box 1 + Box 2 combined
+    - Box 4: Input VAT (purchases) → transactions where vat_type='input', shows vat_amount
+    - Box 5: Net VAT (Box 3 - 4) → shows all VAT transactions
+    - Box 6: Total sales excl. VAT → output transactions, shows net_amount
+    - Box 7: Total purchases excl. VAT → input transactions, shows net_amount
+    - Box 8: EU supplies → not applicable post-Brexit
+    - Box 9: EU acquisitions → not applicable post-Brexit
+    """
+
+    company_id = str(current_user.company_id)
+
+    # Base query — all VAT-classified transactions in period
+    base_query = db.query(Transaction).filter(
+        Transaction.company_id == company_id,
+        Transaction.transaction_date >= period_start,
+        Transaction.transaction_date <= period_end,
+        Transaction.vat_rate_id.isnot(None),
+        Transaction.deleted_at.is_(None),
+    )
+
+    # Filter based on box
+    box_descriptions = {
+        1: "VAT due on sales and other outputs",
+        2: "VAT due on acquisitions from EU member states",
+        3: "Total VAT due (Box 1 + Box 2)",
+        4: "VAT reclaimed on purchases and other inputs",
+        5: "Net VAT to pay or reclaim (Box 3 − Box 4)",
+        6: "Total value of sales excluding VAT",
+        7: "Total value of purchases excluding VAT",
+        8: "Total value of supplies to EU",
+        9: "Total value of acquisitions from EU",
+    }
+
+    if box == 1:
+        # Output VAT — sales
+        transactions = base_query.filter(
+            Transaction.vat_type == "output"
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "vat_amount"
+
+    elif box == 2:
+        # EU acquisitions / reverse charge
+        transactions = base_query.filter(
+            Transaction.description.ilike("%reverse charge%")
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "vat_amount"
+
+    elif box == 3:
+        # Total VAT due = output + reverse charge
+        transactions = base_query.filter(
+            (Transaction.vat_type == "output") |
+            (Transaction.description.ilike("%reverse charge%"))
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "vat_amount"
+
+    elif box == 4:
+        # Input VAT — purchases
+        transactions = base_query.filter(
+            Transaction.vat_type == "input"
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "vat_amount"
+
+    elif box == 5:
+        # Net VAT — all VAT transactions
+        transactions = base_query.order_by(
+            Transaction.transaction_date.desc()
+        ).all()
+        value_field = "vat_amount"
+
+    elif box == 6:
+        # Total sales net — output transactions
+        transactions = base_query.filter(
+            Transaction.vat_type == "output"
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "net_amount"
+
+    elif box == 7:
+        # Total purchases net — input transactions
+        transactions = base_query.filter(
+            Transaction.vat_type == "input"
+        ).order_by(Transaction.transaction_date.desc()).all()
+        value_field = "net_amount"
+
+    elif box in (8, 9):
+        # EU supplies/acquisitions — usually empty post-Brexit
+        transactions = []
+        value_field = "net_amount"
+
+    else:
+        transactions = []
+        value_field = "vat_amount"
+
+    # Format response
+    result_transactions = []
+    for txn in transactions:
+        # Get the VAT rate name
+        vat_rate = db.query(VATRate).filter(VATRate.id == txn.vat_rate_id).first()
+
+        result_transactions.append({
+            "id": str(txn.id),
+            "date": txn.transaction_date.isoformat(),
+            "counterparty": txn.counterparty_name or "Unknown",
+            "description": txn.description or "",
+            "category": txn.category or "Uncategorised",
+            "amount": float(txn.amount or 0),
+            "net_amount": float(txn.net_amount or 0),
+            "vat_amount": float(txn.vat_amount or 0),
+            "gross_amount": float(txn.gross_amount or 0),
+            "vat_type": txn.vat_type,
+            "vat_rate_name": vat_rate.name if vat_rate else "Unknown",
+            "vat_rate_pct": float(vat_rate.rate) if vat_rate and vat_rate.rate else None,
+            "vat_inclusive": txn.vat_inclusive,
+        })
+
+    # Calculate total for the value field
+    total = sum(
+        float(getattr(txn, value_field) or 0)
+        for txn in transactions
+    )
+
+    return {
+        "box": box,
+        "box_description": box_descriptions.get(box, ""),
+        "value_field": value_field,
+        "period_start": period_start.isoformat(),
+        "period_end": period_end.isoformat(),
+        "total": round(total, 2),
+        "transaction_count": len(result_transactions),
+        "transactions": result_transactions,
+    }
 
 
 @router.get(
