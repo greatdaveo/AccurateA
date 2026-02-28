@@ -232,3 +232,106 @@ async def get_category_transactions(
             for txn in transactions
         ],
     }
+
+
+@router.get(
+    "/ct-computation",
+    summary="Corporation Tax computation",
+    description="Full UK Corporation Tax computation for an accounting period"
+)
+async def get_ct_computation(
+    period_start: str = Query(
+        default=None,
+        description="Start of accounting period (YYYY-MM-DD)"
+    ),
+    period_end: str = Query(
+        default=None,
+        description="End of accounting period (YYYY-MM-DD)"
+    ),
+    associated_companies: int = Query(
+        default=0,
+        description="Number of associated companies (affects CT thresholds)"
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Produce the full Corporation Tax computation.
+    Start with accounting profit -> adjustments -> taxable profit -> CT liability.
+    """
+    from datetime import date as dt_date
+    from app.services.corporation_tax_service import CorporationTaxService
+
+    # Default to current tax year (6 Apr – 5 Apr)
+    if not period_start or not period_end:
+        today = dt_date.today()
+        if today.month > 4 or (today.month == 4 and today.day >= 6):
+            start = dt_date(today.year, 4, 6)
+            end = dt_date(today.year + 1, 4, 5)
+        else:
+            start = dt_date(today.year - 1, 4, 6)
+            end = dt_date(today.year, 4, 5)
+    else:
+        start = dt_date.fromisoformat(period_start)
+        end = dt_date.fromisoformat(period_end)
+
+    service = CorporationTaxService(db, str(current_user.company_id))
+
+    try:
+        computation = service.compute(
+            period_start=start,
+            period_end=end,
+            associated_companies=associated_companies,
+        )
+        return computation
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to compute Corporation Tax: {str(e)}"
+        )
+
+
+@router.get(
+    "/capital-allowances",
+    summary="Capital Allowances breakdown",
+    description="UK Capital Allowances computation for a tax year"
+)
+async def get_capital_allowances(
+    tax_year: int = Query(
+        default=None,
+        description="Tax year start (e.g., 2025 for 2025/26)"
+    ),
+    prefer_aia: bool = Query(
+        default=True,
+        description="Prefer AIA over Full Expensing"
+    ),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Calculate Capital Allowances — AIA, WDA, FYA, Full Expensing.
+    Shows pool movements and the depreciation vs allowances adjustment.
+    """
+    from datetime import date as dt_date
+    from app.services.capital_allowances_service import CapitalAllowancesService
+
+    if not tax_year:
+        today = dt_date.today()
+        if today.month > 4 or (today.month == 4 and today.day >= 6):
+            tax_year = today.year
+        else:
+            tax_year = today.year - 1
+
+    service = CapitalAllowancesService(db, str(current_user.company_id))
+
+    try:
+        allowances = service.calculate_allowances(
+            tax_year=tax_year,
+            prefer_aia=prefer_aia,
+        )
+        return allowances
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate Capital Allowances: {str(e)}"
+        )
