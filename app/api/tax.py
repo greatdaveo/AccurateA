@@ -152,3 +152,83 @@ async def get_tax_report(
     report = service.generate_tax_report(tax_year)
 
     return report
+
+
+@router.get(
+    "/category-transactions",
+    summary="Get transactions by tax category",
+    description="Drill into a tax category to see all transactions classified under it"
+)
+async def get_category_transactions(
+    category_name: str = Query(..., description="Tax category name"),
+    tax_year: int = Query(default=None, description="Tax year"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get all transactions for a specific tax category.
+    Used by the frontend drill-down when users click on a category row.
+    """
+    from datetime import date as dt_date
+
+    if not tax_year:
+        today = dt_date.today()
+        # UK tax year: 6 Apr to 5 Apr
+        if today.month > 4 or (today.month == 4 and today.day >= 6):
+            tax_year = today.year
+        else:
+            tax_year = today.year - 1
+
+    # Find the category
+    category = db.query(TaxCategory).filter(
+        TaxCategory.company_id == current_user.company_id,
+        TaxCategory.name == category_name,
+        TaxCategory.deleted_at.is_(None),
+    ).first()
+
+    from app.models import Transaction
+
+    if category_name == "Unclassified":
+        # Special case: transactions without any tax category
+        transactions = db.query(Transaction).filter(
+            Transaction.company_id == current_user.company_id,
+            Transaction.tax_category_id.is_(None),
+            Transaction.tax_year == tax_year,
+            Transaction.deleted_at.is_(None),
+        ).order_by(Transaction.transaction_date.desc()).all()
+    elif not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tax category '{category_name}' not found"
+        )
+    else:
+        transactions = db.query(Transaction).filter(
+            Transaction.company_id == current_user.company_id,
+            Transaction.tax_category_id == category.id,
+            Transaction.tax_year == tax_year,
+            Transaction.deleted_at.is_(None),
+        ).order_by(Transaction.transaction_date.desc()).all()
+
+    return {
+        "category_name": category_name,
+        "tax_year": f"{tax_year}/{tax_year + 1}",
+        "is_deductible": category.is_deductible if category else None,
+        "deduction_percentage": float(category.deduction_percentage) if category else 0,
+        "description": category.description if category else "Transactions not yet assigned to a tax category",
+        "transaction_count": len(transactions),
+        "transactions": [
+            {
+                "id": str(txn.id),
+                "date": txn.transaction_date.isoformat(),
+                "counterparty": txn.counterparty_name or "Unknown",
+                "description": txn.description or "",
+                "category": txn.category or "",
+                "amount": float(txn.amount or 0),
+                "deductible_amount": float(txn.deductible_amount or 0),
+                "is_deductible": txn.is_deductible,
+                "vat_amount": float(txn.vat_amount or 0) if txn.vat_amount else None,
+                "net_amount": float(txn.net_amount or 0) if txn.net_amount else None,
+            }
+            for txn in transactions
+        ],
+    }
