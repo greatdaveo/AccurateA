@@ -1,7 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, date as dt_date
 from typing import List
 
 from app.utils.database import SessionLocal
@@ -64,7 +64,7 @@ class SchedulerService:
         #Monthly depreciation - last day of month at 11pm
         self.scheduler.add_job(
             func=self.monthly_depreciation_job,
-            trigger=CronTrigger(day='last', hour=23, minute=0),
+            trigger=CronTrigger(day=1, hour=0, minute=5),
             id='monthly_depreciation',
             name='Monthly Asset Depreciation',
             replace_existing=True
@@ -251,38 +251,91 @@ class SchedulerService:
         finally:
             db.close()
 
+
     def monthly_depreciation_job(self):
-        """Records depreciation for all assets on last day of month."""
+        """Records depreciation for all assets on 1st of each month.
+        Respects the auto_depreciation_enabled setting per company."""
+        from datetime import date as dt_date
         db = SessionLocal()
 
         try:
-            today = date.today()
+            today = dt_date.today()
+            # We're on the 1st, so depreciate the previous month
+            if today.month == 1:
+                dep_month, dep_year = 12, today.year - 1
+            else:
+                dep_month, dep_year = today.month - 1, today.year
 
             companies = db.query(Company).filter(
                 Company.deleted_at.is_(None)
             ).all()
 
-            print(f"Processing depreciation for {len(companies)} companies")
+            print(f"[Depreciation] Processing {len(companies)} companies for {dep_month}/{dep_year}")
 
             for company in companies:
                 try:
+                    # Check if auto-depreciation is enabled (default: True)
+                    settings = company.settings or {}
+                    if not settings.get("auto_depreciation_enabled", True):
+                        print(f"  ⏭️  {company.name}: Auto-depreciation disabled")
+                        continue
+
                     service = DepreciationService(db, str(company.id))
-                    result = service.record_monthly_depreciation(
-                        today.month,
-                        today.year
+                    result = service.record_monthly_depreciation(dep_month, dep_year)
+
+                    # Log the run as activity
+                    self._log_depreciation_activity(
+                        db, str(company.id), dep_month, dep_year, result
                     )
 
-                    print(f"{company.name}: ${result['total_depreciation']:.2f}")
+                    print(
+                        f"{company.name}: £{result['total_depreciation']:.2f} "
+                        f"({result['assets_processed']} assets)"
+                    )
 
                 except Exception as e:
                     print(f"{company.name}: {e}")
                     continue
 
         except Exception as e:
-            print(f"Monthly depreciation error: {e}")
+            print(f"[Depreciation] Job error: {e}")
 
         finally:
             db.close()
 
+
+    def _log_depreciation_activity(
+        self, db: Session, company_id: str, month: int, year: int, result: dict
+    ):
+        """Log the depreciation run as a system journal entry note.
+        This makes it visible in the dashboard's recent activity feed."""
+        from app.models import JournalEntry
+
+        if result["assets_processed"] == 0:
+            return
+
+        # The journal entries created by the depreciation service are already in the DB.
+        # We just create a summary note as a system transaction so it appears in recent activity queries.
+        try:
+            from app.models import Transaction
+            import uuid
+
+            summary_txn = Transaction(
+                id=uuid.uuid4(),
+                company_id=company_id,
+                transaction_date=dt_date(year, month, 1),
+                description=(
+                    f"Auto-depreciation recorded: £{result['total_depreciation']:.2f} "
+                    f"across {result['assets_processed']} assets ({month}/{year})"
+                ),
+                amount=0,  # Summary only — actual amounts are in journal entries
+                transaction_type="system",
+                classification_status="auto_approved",
+            )
+            db.add(summary_txn)
+            db.commit()
+        except Exception as e:
+            print(f"Activity log failed: {e}")
+            db.rollback()
 
 scheduler = SchedulerService()

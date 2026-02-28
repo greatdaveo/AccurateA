@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.utils.database import get_db
 from app.api.auth import get_current_user
-from app.models import User, Account
+from app.models import User, Account, Company
 from app.services.coa_template_service import COATemplateService
 
 
@@ -118,3 +118,53 @@ async def seed_template(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+
+
+@router.put(
+    "/settings",
+    summary="Update company settings",
+    description="Update company-level settings (e.g., auto-depreciation toggle)"
+)
+async def update_company_settings(
+    settings_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update company settings JSON."""
+    company = db.query(Company).filter(
+        Company.id == current_user.company_id,
+        Company.deleted_at.is_(None),
+    ).first()
+
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    # Merge new settings into existing
+    current_settings = company.settings or {}
+    current_settings.update(settings_data)
+    company.settings = current_settings
+
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(company, "settings")
+    db.commit()
+
+    return {"success": True, "settings": company.settings}
+
+
+@router.get(
+    "/settings",
+    summary="Get company settings",
+)
+async def get_company_settings(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    company = db.query(Company).filter(
+        Company.id == current_user.company_id,
+        Company.deleted_at.is_(None),
+    ).first()
+
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    return {"settings": company.settings or {}}
