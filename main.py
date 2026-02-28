@@ -28,7 +28,8 @@ from app.api import (
     teabot,
     health,
     audit,
-    vat
+    vat,
+    hmrc
 )
 from app.services.scheduler_service import scheduler
 
@@ -108,6 +109,8 @@ app.include_router(teabot.router)
 app.include_router(health.router)
 app.include_router(audit.router)
 app.include_router(vat.router)
+app.include_router(hmrc.router)
+
 
 
 #Root Endpoints
