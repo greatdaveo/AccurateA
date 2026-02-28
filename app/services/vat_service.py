@@ -208,7 +208,7 @@ class VATService:
         existing = VATReturn.get_by_period(
             self.db, company_id, period_start, period_end
         )
-        if existing and existing.status in ("submitted", "accepted"):
+        if existing and existing.status in ("submitted", "accepted") and save_draft:
             raise ValueError(
                 f"A VAT return for {period_start} to {period_end} has already "
                 f"been submitted (status: {existing.status}). Cannot regenerate."

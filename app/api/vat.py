@@ -36,23 +36,48 @@ class VATReturnResponse(BaseModel):
     company_id: str
     period_start: date
     period_end: date
-    box1_vat_due_sales: float
-    box2_vat_due_acquisitions: float
-    box3_total_vat_due: float
-    box4_vat_reclaimed: float
-    box5_net_vat: float
-    box6_total_sales_excl_vat: float
-    box7_total_purchases_excl_vat: float
-    box8_total_supplies_eu: float
-    box9_total_acquisitions_eu: float
+    box1_vat_due_sales: float = 0
+    box2_vat_due_acquisitions: float = 0
+    box3_total_vat_due: float = 0
+    box4_vat_reclaimed: float = 0
+    box5_net_vat: float = 0
+    box6_total_sales_excl_vat: float = 0
+    box7_total_purchases_excl_vat: float = 0
+    box8_total_supplies_eu: float = 0
+    box9_total_acquisitions_eu: float = 0
     status: str
     notes: Optional[str] = None
     submitted_at: Optional[datetime] = None
     hmrc_receipt_id: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_orm_model(cls, obj):
+        """Convert SQLAlchemy model with Decimal/UUID fields to response."""
+        return cls(
+            id=str(obj.id),
+            company_id=str(obj.company_id),
+            period_start=obj.period_start,
+            period_end=obj.period_end,
+            box1_vat_due_sales=float(obj.box1_vat_due_sales or 0),
+            box2_vat_due_acquisitions=float(obj.box2_vat_due_acquisitions or 0),
+            box3_total_vat_due=float(obj.box3_total_vat_due or 0),
+            box4_vat_reclaimed=float(obj.box4_vat_reclaimed or 0),
+            box5_net_vat=float(obj.box5_net_vat or 0),
+            box6_total_sales_excl_vat=float(obj.box6_total_sales_excl_vat or 0),
+            box7_total_purchases_excl_vat=float(obj.box7_total_purchases_excl_vat or 0),
+            box8_total_supplies_eu=float(obj.box8_total_supplies_eu or 0),
+            box9_total_acquisitions_eu=float(obj.box9_total_acquisitions_eu or 0),
+            status=obj.status,
+            notes=obj.notes,
+            submitted_at=obj.submitted_at,
+            hmrc_receipt_id=obj.hmrc_receipt_id,
+            created_at=obj.created_at,
+        )
+
 
 
 class VATReturnCreateRequest(BaseModel):
@@ -159,7 +184,8 @@ async def list_vat_returns(
         str(current_user.company_id),
         status=status_filter,
     )
-    return returns
+
+    return [VATReturnResponse.from_orm_model(r) for r in returns]
 
 
 @router.get(
@@ -281,7 +307,7 @@ async def save_vat_return(
 
     vat_return.update(db)
 
-    return vat_return
+    return VATReturnResponse.from_orm_model(vat_return)
 
 
 @router.get(
@@ -458,7 +484,7 @@ async def get_vat_return(
             detail="VAT return not found"
         )
 
-    return vat_return
+    return VATReturnResponse.from_orm_model(vat_return)
 
 
 @router.get(
