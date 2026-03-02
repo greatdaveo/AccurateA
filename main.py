@@ -29,7 +29,8 @@ from app.api import (
     health,
     audit,
     vat,
-    hmrc
+    hmrc,
+    documents
 )
 from app.services.scheduler_service import scheduler
 
@@ -110,7 +111,14 @@ app.include_router(health.router)
 app.include_router(audit.router)
 app.include_router(vat.router)
 app.include_router(hmrc.router)
+app.include_router(documents.router)
 
+# To serve local uploads in dev
+import os
+if os.getenv("STORAGE_BACKEND", "local") == "local":
+    from fastapi.staticfiles import StaticFiles
+    os.makedirs("./uploads", exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 
 #Root Endpoints
@@ -121,6 +129,7 @@ def root():
         "status": "active",
         "version": "0.1.0"
     }
+
 
 @app.get("/health")
 async def health_check():

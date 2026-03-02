@@ -15,6 +15,7 @@ from app.models.asset import Asset
 from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.vat import VATRate, VATScheme, VATReturn
+from app.models.document import Document
 
 
 #Export all models
@@ -38,6 +39,7 @@ __all__ = [
     "AuditLog",
     "VATRate",
     "VATScheme",
-    "VATReturn"
+    "VATReturn",
+    "Document"
 ]
 
