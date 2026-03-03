@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     plaid_country_codes: str = "US,CA"
     plaid_recovery_code: Optional[str] = None
 
+    # TrueLayer (UK Open Banking)
+    truelayer_client_id: Optional[str] = None
+    truelayer_client_secret: Optional[str] = None
+    truelayer_redirect_uri: str = "http://localhost:5173/banking/callback"
+    truelayer_environment: str = "sandbox"  # sandbox | live
+
     #Gmail API
     gmail_client_id: Optional[str] = None
     gmail_client_secret: Optional[str] = None

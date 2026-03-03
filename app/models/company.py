@@ -55,6 +55,13 @@ class Company(BaseModel):
         comment="Base currency code (USD, EUR, etc)"
     )
 
+    country = Column(
+        String(2),
+        default="GB",
+        nullable=False,
+        comment="ISO country code (GB, US, etc.)"
+    )
+
     # Business Info
     incorporation_date = Column(
         Date,
