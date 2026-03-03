@@ -239,7 +239,7 @@ class JournalEntryAgent(BaseAgent):
         #Check balance and allow small floating point diff
         if abs(total_debits - total_credits) > 0.01:
             self.log(f"Entry not balanced! DR: {total_debits}, CR: {total_credits}")
-            return false
+            return False
 
         self.log(f"Entry balanced: DR: {total_debits}, CR: {total_credits}")
 

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from fastapi.params import Depends
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from app.models import User, Company, RefreshToken
+from app.models import User, Company, Account, RefreshToken
 from app.utils.security import password_hasher, jwt_service
 from app.schemas.user import (
     UserRegistrationSchema,
@@ -13,6 +13,7 @@ from app.schemas.user import (
 )
 from app.utils.database import get_db
 from app.config import settings
+
 
 
 class AuthService:
@@ -72,6 +73,9 @@ class AuthService:
             accounting_standard=user_data.accounting_standard or "IFRS"
         )
 
+        # Seed chart of accounts for new company
+        Account.create_default_chart(self.db, str(company.id))
+
         password_hash = password_hasher.hash_password(user_data.password)
 
         user = User.create(
@@ -108,6 +112,9 @@ class AuthService:
             )
 
         user.update_last_login(self.db)
+
+        # Seed chart of accounts for new company
+        # Account.create_default_chart(self.db, str(user.company_id))
 
         tokens = self._generate_tokens(user)
 
