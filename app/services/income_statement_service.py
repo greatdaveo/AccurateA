@@ -59,3 +59,39 @@ class IncomeStatementService:
             "is_profitable": net_income >= 0
         }
 
+
+    def generate_comparative_income_statement(
+        self,
+        start_date: date,
+        end_date: date,
+        comp_start_date: date,
+        comp_end_date: date,
+    ) -> Dict[str, Any]:
+        """Generate P&L with current vs comparison period side-by-side."""
+        current = self.generate_income_statement(start_date, end_date)
+        comparison = self.generate_income_statement(comp_start_date, comp_end_date)
+
+        # Build comparison data
+        def _calc_variance(current_val, comparison_val):
+            change = current_val - comparison_val
+            pct = (change / comparison_val * 100) if comparison_val != 0 else 0
+            return {"amount": round(change, 2), "percentage": round(pct, 1)}
+
+        return {
+            "statement_type": "comparative_income_statement",
+            "current_period": {
+                "start": str(start_date),
+                "end": str(end_date),
+                **current,
+            },
+            "comparison_period": {
+                "start": str(comp_start_date),
+                "end": str(comp_end_date),
+                **comparison,
+            },
+            "variance": {
+                "revenue": _calc_variance(current["revenue"]["total"], comparison["revenue"]["total"]),
+                "expenses": _calc_variance(current["expenses"]["total"], comparison["expenses"]["total"]),
+                "net_income": _calc_variance(current["net_income"], comparison["net_income"]),
+            },
+        }

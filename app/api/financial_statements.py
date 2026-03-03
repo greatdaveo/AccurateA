@@ -318,6 +318,32 @@ async def get_account_transactions(
     }
 
 
+@router.get("/income-statement/comparative", summary="Comparative P&L")
+async def get_comparative_income_statement(
+    start_date: date = Query(...),
+    end_date: date = Query(...),
+    comp_start_date: date = Query(...),
+    comp_end_date: date = Query(...),
+    current_user: User = Depends(require_permission("view_reports")),
+    db: Session = Depends(get_db),
+):
+    service = IncomeStatementService(db, str(current_user.company_id))
+    return service.generate_comparative_income_statement(
+        start_date, end_date, comp_start_date, comp_end_date
+    )
+
+
+@router.get("/balance-sheet/comparative", summary="Comparative Balance Sheet")
+async def get_comparative_balance_sheet(
+    current_date: date = Query(...),
+    comparison_date: date = Query(...),
+    current_user: User = Depends(require_permission("view_reports")),
+    db: Session = Depends(get_db),
+):
+    service = BalanceSheetService(db, str(current_user.company_id))
+    return service.generate_comparative_balance_sheet(current_date, comparison_date)
+
+
 @router.get("/fiscal-periods", summary="Get fiscal periods")
 async def get_fiscal_periods(
     current_user: User = Depends(require_permission("view_reports")),

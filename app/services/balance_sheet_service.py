@@ -73,3 +73,27 @@ class BalanceSheetService:
         }
 
 
+    def generate_comparative_balance_sheet(
+        self,
+        current_date: date,
+        comparison_date: date,
+    ) -> Dict[str, Any]:
+        """Generate BS with current vs comparison date side-by-side."""
+        current = self.generate_balance_sheet(current_date)
+        comparison = self.generate_balance_sheet(comparison_date)
+
+        def _calc_variance(current_val, comparison_val):
+            change = current_val - comparison_val
+            pct = (change / comparison_val * 100) if comparison_val != 0 else 0
+            return {"amount": round(change, 2), "percentage": round(pct, 1)}
+
+        return {
+            "statement_type": "comparative_balance_sheet",
+            "current": {"as_of": str(current_date), **current},
+            "comparison": {"as_of": str(comparison_date), **comparison},
+            "variance": {
+                "assets": _calc_variance(current["assets"]["total"], comparison["assets"]["total"]),
+                "liabilities": _calc_variance(current["liabilities"]["total"], comparison["liabilities"]["total"]),
+                "equity": _calc_variance(current["equity"]["total"], comparison["equity"]["total"]),
+            },
+        }
