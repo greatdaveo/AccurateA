@@ -417,3 +417,68 @@ async def export_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get(
+    "/export-excel/{report_type}",
+    summary="Export statement as branded Excel workbook",
+)
+async def export_excel(
+    report_type: str,
+    start_date: date = Query(default=None),
+    end_date: date = Query(default=None),
+    current_user: User = Depends(require_permission("view_reports")),
+    db: Session = Depends(get_db),
+):
+    """Export financial statement as Excel (.xlsx)."""
+    from app.services.excel_export_service import ExcelExportService
+    from app.models import Company
+    from fastapi.responses import StreamingResponse
+
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = date(end_date.year, end_date.month, 1)
+
+    company = db.query(Company).filter(Company.id == current_user.company_id).first()
+    company_name = company.name if company else "Company"
+
+    excel_service = ExcelExportService(
+        company_name=company_name,
+        downloaded_by=f"{current_user.first_name} {current_user.last_name}",
+    )
+
+    if report_type == "income-statement":
+        service = IncomeStatementService(db, str(current_user.company_id))
+        data = service.generate_income_statement(start_date, end_date)
+        excel_bytes = excel_service.generate_income_statement(data, str(start_date), str(end_date))
+        filename = f"Income_Statement_{start_date}_to_{end_date}.xlsx"
+
+    elif report_type == "balance-sheet":
+        service = BalanceSheetService(db, str(current_user.company_id))
+        data = service.generate_balance_sheet(end_date)
+        excel_bytes = excel_service.generate_balance_sheet(data, str(end_date))
+        filename = f"Balance_Sheet_as_at_{end_date}.xlsx"
+
+    elif report_type == "trial-balance":
+        from app.services.trial_balance_service import TrialBalanceService
+        service = TrialBalanceService(db, str(current_user.company_id))
+        data = service.generate_trial_balance(end_date)
+        excel_bytes = excel_service.generate_trial_balance(data, str(end_date))
+        filename = f"Trial_Balance_as_at_{end_date}.xlsx"
+
+    elif report_type == "etb":
+        from app.services.etb_service import ETBService
+        service = ETBService(db, str(current_user.company_id))
+        data = service.generate_etb(start_date, end_date)
+        excel_bytes = excel_service.generate_etb(data, str(start_date), str(end_date))
+        filename = f"ETB_{start_date}_to_{end_date}.xlsx"
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown report: {report_type}")
+
+    return StreamingResponse(
+        io.BytesIO(excel_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
