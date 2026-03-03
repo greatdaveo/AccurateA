@@ -18,6 +18,7 @@ from app.models.vat import VATRate, VATScheme, VATReturn
 from app.models.document import Document
 from app.models.fiscal_period import FiscalPeriod
 from app.models.open_banking_connection import OpenBankingConnection
+from app.models.bank_rule import BankRule
 
 
 #Export all models
@@ -44,6 +45,7 @@ __all__ = [
     "VATReturn",
     "Document",
     "FiscalPeriod",
-    "OpenBankingConnection"
+    "OpenBankingConnection",
+    "BankRule"
 ]
 
