@@ -32,7 +32,8 @@ from app.api import (
     hmrc,
     documents,
     banking,
-    bank_rules
+    bank_rules,
+    onboarding
 )
 from app.services.scheduler_service import scheduler
 
@@ -116,7 +117,7 @@ app.include_router(hmrc.router)
 app.include_router(documents.router)
 app.include_router(banking.router)
 app.include_router(bank_rules.router)
-
+app.include_router(onboarding.router)
 
 # To serve local uploads in dev
 import os
