@@ -115,6 +115,34 @@ async def classify_pending(service: TransactionService = Depends(get_transaction
     }
 
 
+@router.post(
+    "/batch-approve",
+    summary="Batch approve transactions",
+    description="Approve multiple transactions at once"
+)
+async def batch_approve(
+    transaction_ids: list[str],
+    current_user: User = Depends(require_permission("approve_transactions")),
+    db: Session = Depends(get_db),
+):
+    """Batch approve multiple transactions."""
+    service = TransactionService(db, str(current_user.company_id))
+    approved = 0
+    errors = []
+
+    for txn_id in transaction_ids:
+        try:
+            service.approve_classification(txn_id, str(current_user.id))
+            approved += 1
+        except Exception as e:
+            errors.append({"id": txn_id, "error": str(e)})
+
+    return {
+        "approved": approved,
+        "errors": errors,
+        "message": f"Approved {approved} of {len(transaction_ids)} transactions",
+    }
+
 
 @router.get(
     "/{transaction_id}",
