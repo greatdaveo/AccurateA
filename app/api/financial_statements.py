@@ -318,6 +318,72 @@ async def get_account_transactions(
     }
 
 
+@router.get("/fiscal-periods", summary="Get fiscal periods")
+async def get_fiscal_periods(
+    current_user: User = Depends(require_permission("view_reports")),
+    db: Session = Depends(get_db),
+):
+    from app.models.fiscal_period import FiscalPeriod
+    periods = FiscalPeriod.get_company_periods(db, str(current_user.company_id))
+    return [{
+        "id": str(p.id),
+        "name": p.name,
+        "period_start": str(p.period_start),
+        "period_end": str(p.period_end),
+        "period_type": p.period_type,
+        "status": p.status,
+        "closed_at": str(p.closed_at) if p.closed_at else None,
+    } for p in periods]
+
+
+@router.post("/fiscal-periods/generate", summary="Generate monthly periods for a year")
+async def generate_periods(
+    year: int = Query(...),
+    current_user: User = Depends(require_permission("manage_settings")),
+    db: Session = Depends(get_db),
+):
+    from app.services.period_close_service import PeriodCloseService
+    service = PeriodCloseService(db, str(current_user.company_id))
+    periods = service.create_monthly_periods(year)
+    return {"count": len(periods), "year": year}
+
+
+@router.post("/fiscal-periods/{period_id}/close", summary="Close a period")
+async def close_period(
+    period_id: str,
+    current_user: User = Depends(require_permission("manage_settings")),
+    db: Session = Depends(get_db),
+):
+    from app.services.period_close_service import PeriodCloseService
+    service = PeriodCloseService(db, str(current_user.company_id))
+    period = service.close_period(period_id, str(current_user.id))
+    return {"status": period.status, "name": period.name}
+
+
+@router.post("/fiscal-periods/{period_id}/reopen", summary="Reopen a closed period")
+async def reopen_period(
+    period_id: str,
+    current_user: User = Depends(require_permission("manage_settings")),
+    db: Session = Depends(get_db),
+):
+    from app.services.period_close_service import PeriodCloseService
+    service = PeriodCloseService(db, str(current_user.company_id))
+    period = service.reopen_period(period_id, str(current_user.id))
+    return {"status": period.status, "name": period.name}
+
+
+@router.post("/year-end-close", summary="Execute year-end closing process")
+async def year_end_close(
+    year_end_date: date = Query(...),
+    current_user: User = Depends(require_permission("manage_settings")),
+    db: Session = Depends(get_db),
+):
+    from app.services.period_close_service import PeriodCloseService
+    service = PeriodCloseService(db, str(current_user.company_id))
+    result = service.close_year(year_end_date, str(current_user.id))
+    return result
+
+
 @router.get(
     "/export-pdf/{report_type}",
     summary="Export statement as branded PDF",

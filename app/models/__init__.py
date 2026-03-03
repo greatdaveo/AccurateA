@@ -16,6 +16,7 @@ from app.models.refresh_token import RefreshToken
 from app.models.audit_log import AuditLog
 from app.models.vat import VATRate, VATScheme, VATReturn
 from app.models.document import Document
+from app.models.fiscal_period import FiscalPeriod
 
 
 #Export all models
@@ -40,6 +41,7 @@ __all__ = [
     "VATRate",
     "VATScheme",
     "VATReturn",
-    "Document"
+    "Document",
+    "FiscalPeriod"
 ]
 

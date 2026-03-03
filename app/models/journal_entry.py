@@ -6,6 +6,8 @@ from datetime import  date
 from decimal import Decimal
 from app.models.base import BaseModel
 from app.models import Account
+from app.models.fiscal_period import FiscalPeriod
+
 
 class JournalEntry(BaseModel):
     """Every transaction must be recorded as a journal entry with balanced Dr  and Cr"""
@@ -124,6 +126,14 @@ class JournalEntry(BaseModel):
         created_by_id: str = None
     ) -> 'JournalEntry':
         """Create a journal entry with lines"""
+
+        # Period close validation
+        if FiscalPeriod.is_date_in_closed_period(db, company_id, entry_date):
+            raise ValueError(
+                f"Cannot create journal entry: the period containing "
+                f"{entry_date} is closed or locked."
+            )
+
         entry_number = cls._generate_entry_number(db, company_id, entry_date)
 
         #create entry
