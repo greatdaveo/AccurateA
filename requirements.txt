@@ -63,3 +63,4 @@ reportlab==4.1.0
 
 # MONITORING
 psutil==5.9.8
+sentry-sdk[fastapi]>=2.0.0

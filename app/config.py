@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     receipt_email_address: Optional[str] = None
     receipt_email_password: Optional[str] = None
 
+    # Sentry Error Monitoring
+    sentry_dsn: Optional[str] = None
+    sentry_traces_sample_rate: float = 0.2
+
     #Email Processing
     email_check_interval: int = 300  # 5 minutes
 

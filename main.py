@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
-
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security import SecurityMiddleware
 from app.middleware.cors_config import configure_cors
@@ -36,8 +35,22 @@ from app.api import (
     onboarding
 )
 from app.services.scheduler_service import scheduler
+from app.middleware.sentry_middleware import SentryUserMiddleware
 
 import uvicorn
+import sentry_sdk
+
+
+# Sentry Error Monitoring
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        traces_sample_rate=settings.sentry_traces_sample_rate,
+        send_default_pii=True,
+        enable_tracing=True,
+    )
+    logger.info("Sentry initialized for error monitoring")
 
 
 @asynccontextmanager
@@ -92,6 +105,9 @@ app.add_middleware(PerformanceMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000) # Compress responses > 1KB
 # Request ID Middleware (for tracing)
 app.add_middleware(RequestIDMiddleware)
+# Sentry User Tagging Middleware
+if settings.sentry_dsn:
+    app.add_middleware(SentryUserMiddleware)
 
 
 #Router
@@ -126,6 +142,10 @@ if os.getenv("STORAGE_BACKEND", "local") == "local":
     os.makedirs("./uploads", exist_ok=True)
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
+
+# @app.get("/sentry-test")
+# async def sentry_test():
+#     raise ValueError("Sentry backend test error!")
 
 #Root Endpoints
 @app.get("/")
