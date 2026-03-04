@@ -6,6 +6,8 @@ from datetime import date
 from app.utils.database import get_db
 from app.api.auth import get_current_user
 from app.models import User, Company, Account
+from sqlalchemy.orm.attributes import flag_modified
+
 
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 
@@ -57,6 +59,15 @@ async def get_onboarding_status(
             "documents": onboarding.get("documents", False),
             "review": onboarding.get("review", False),
         },
+        "company": {
+            "name": company.name,
+            "legal_name": company.legal_name,
+            "tax_id": company.tax_id,
+            "industry": company.industry,
+            "country": company.country,
+            "base_currency": company.base_currency,
+            "accounting_standard": company.accounting_standard,
+        },
     }
 
 
@@ -97,7 +108,7 @@ async def save_company_details(
     onboarding["vat_registered"] = payload.vat_registered
     settings["onboarding"] = onboarding
     company.settings = settings
-
+    flag_modified(company, "settings")
     company.update(db)
 
     return {"success": True, "message": "Company details saved", "next_step": 2}
@@ -134,6 +145,7 @@ async def setup_chart_of_accounts(
     onboarding["current_step"] = 3
     settings["onboarding"] = onboarding
     company.settings = settings
+    flag_modified(company, "settings")
     company.update(db)
 
     return {"success": True, "message": message, "next_step": 3}
@@ -158,6 +170,7 @@ async def mark_bank_step(
     onboarding["current_step"] = 4
     settings["onboarding"] = onboarding
     company.settings = settings
+    flag_modified(company, "settings")
     company.update(db)
 
     return {"success": True, "next_step": 4}
@@ -182,6 +195,7 @@ async def mark_documents_step(
     onboarding["current_step"] = 5
     settings["onboarding"] = onboarding
     company.settings = settings
+    flag_modified(company, "settings")
     company.update(db)
 
     return {"success": True, "next_step": 5}
@@ -207,6 +221,7 @@ async def complete_onboarding(
     onboarding["current_step"] = 6
     settings["onboarding"] = onboarding
     company.settings = settings
+    flag_modified(company, "settings")
     company.update(db)
 
     return {"success": True, "message": "Onboarding completed!"}

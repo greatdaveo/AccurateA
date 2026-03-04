@@ -13,8 +13,10 @@ from app.services.etb_service import ETBService
 from app.models import Account, Company, JournalEntry, JournalEntryLine
 from app.utils.security import require_permission
 from app.services.pdf_export_service import PDFExportService
+from app.services.excel_export_service import ExcelExportService
 from fastapi.responses import StreamingResponse
 import io
+
 
 router = APIRouter(
     prefix="/financial-statements",
@@ -430,7 +432,6 @@ async def export_pdf(
     report_type: income-statement | balance-sheet | trial-balance | etb
     """
 
-
     if not end_date:
         end_date = date.today()
     if not start_date:
@@ -512,6 +513,119 @@ async def export_pdf(
 
 
 @router.get(
+    "/export-excel/full",
+    summary="Export all financial statements as one Excel workbook",
+)
+async def export_full_excel(
+    start_date: date = Query(default=None),
+    end_date: date = Query(default=None),
+    current_user: User = Depends(require_permission("view_reports")),
+    db: Session = Depends(get_db),
+):
+    try:
+        if not end_date:
+            end_date = date.today()
+        if not start_date:
+            start_date = date(end_date.year, 1, 1)
+
+        company_id = str(current_user.company_id)
+        company = db.query(Company).filter(Company.id == current_user.company_id).first()
+        company_name = company.name if company else "Company"
+
+        excel_service = ExcelExportService(
+            company_name=company_name,
+            downloaded_by=f"{current_user.first_name} {current_user.last_name}",
+        )
+
+        # 1. Journal Entries
+        entries = db.query(JournalEntry).filter(
+            JournalEntry.company_id == current_user.company_id,
+            JournalEntry.status == "posted",
+            JournalEntry.entry_date >= start_date,
+            JournalEntry.entry_date <= end_date,
+            JournalEntry.deleted_at.is_(None),
+        ).order_by(JournalEntry.entry_date.asc()).all()
+
+        journal_data = []
+        for entry in entries:
+            lines = db.query(JournalEntryLine).filter(
+                JournalEntryLine.journal_entry_id == entry.id,
+            ).all()
+            journal_data.append({
+                "date": str(entry.entry_date),
+                "entry_number": entry.entry_number or str(entry.id)[:8],
+                "description": entry.description or "",
+                "lines": [{
+                    "account_code": line.account.account_code if line.account else "",
+                    "account_name": line.account.account_name if line.account else "",
+                    "debit": float(line.debit_amount or 0),
+                    "credit": float(line.credit_amount or 0),
+                } for line in lines],
+            })
+
+        # 2. Trial Balance
+        tb_service = TrialBalanceService(db, company_id)
+        tb_data = tb_service.generate_trial_balance(end_date)
+
+        # 3. Income Statement
+        is_service = IncomeStatementService(db, company_id)
+        is_data = is_service.generate_income_statement(start_date, end_date)
+
+        # 4. Balance Sheet
+        bs_service = BalanceSheetService(db, company_id)
+        bs_data = bs_service.generate_balance_sheet(end_date)
+
+        # 5. Cash Flow
+        cf_service = CashFlowService(db, company_id)
+        cf_data = cf_service.generate_cash_flow_statement(start_date, end_date)
+
+        # 6. ETB
+        etb_service = ETBService(db, company_id)
+        etb_data = etb_service.generate_etb(start_date, end_date)
+
+        # 7. Chart of Accounts
+        all_accounts = db.query(Account).filter(
+            Account.company_id == current_user.company_id,
+            Account.is_active == True,
+            Account.deleted_at.is_(None),
+        ).order_by(Account.account_code).all()
+
+        accounts_data = [{
+            "account_code": a.account_code,
+            "account_name": a.account_name,
+            "account_type": a.account_type,
+            "sub_type": a.account_subtype,
+            "normal_balance": a.normal_balance,
+            "current_balance": float(a.current_balance or 0),
+        } for a in all_accounts]
+
+        # Generate combined workbook
+        excel_bytes = excel_service.generate_full_workbook(
+            journal_entries=journal_data,
+            trial_balance=tb_data,
+            income_statement=is_data,
+            balance_sheet=bs_data,
+            cash_flow=cf_data,
+            etb=etb_data,
+            accounts=accounts_data,
+            start_date=str(start_date),
+            end_date=str(end_date),
+        )
+
+        filename = f"AccurateA_Financial_Statements_{start_date}_to_{end_date}.xlsx"
+
+        return StreamingResponse(
+            io.BytesIO(excel_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get(
     "/export-excel/{report_type}",
     summary="Export statement as branded Excel workbook",
 )
@@ -574,3 +688,4 @@ async def export_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
