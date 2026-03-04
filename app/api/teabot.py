@@ -52,7 +52,7 @@ async def chat_with_teabot(
     """
     try:
         # Initialize TeaBot
-        teabot = TeaBotAgent(db, str(current_user.company_id))
+        teabot = TeaBotAgent(db, str(current_user.company_id), user=current_user)
 
         # Convert conversation history to proper format
         history = None
@@ -96,7 +96,7 @@ async def get_suggested_questions(
         db: Session = Depends(get_db)
 ):
     """Get suggested questions for TeaBot"""
-    teabot = TeaBotAgent(db, str(current_user.company_id))
+    teabot = TeaBotAgent(db, str(current_user.company_id), user=current_user)
     suggestions = teabot.get_suggested_questions()
 
     return {
@@ -120,7 +120,7 @@ async def get_financial_summary(
     Useful for debugging or showing users what data TeaBot has.
     """
     try:
-        teabot = TeaBotAgent(db, str(current_user.company_id))
+        teabot = TeaBotAgent(db, str(current_user.company_id), user=current_user)
         context = teabot._get_financial_context()
 
         return {
