@@ -2,8 +2,10 @@ from typing import Dict, List, Any
 from datetime import date
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from app.models import Account
+from app.models import Account, JournalEntry, JournalEntryLine
 from app.services.trial_balance_service import TrialBalanceService
+from sqlalchemy import func
+
 
 class IncomeStatementService:
     """This is a P&L statement from trial balance"""
@@ -14,32 +16,84 @@ class IncomeStatementService:
         self.tb_service = TrialBalanceService(db, company_id)
 
     def generate_income_statement(
-        self,
-        start_date: date,
-        end_date: date
+            self,
+            start_date: date,
+            end_date: date
     ) -> Dict[str, Any]:
-        """Generate income statement (P&L)"""
-        tb = self.tb_service.generate_trial_balance(end_date)
+        """Generate income statement (P&L) for a specific period"""
 
-        if not tb:
-            raise ValueError("Trial balance is missing or empty")
+        accounts = Account.get_company_accounts(self.db, self.company_id)
+
+        # Calculate sum of debits and credits for each account in the period
+        period_activity = self.db.query(
+            JournalEntryLine.account_id,
+            func.sum(JournalEntryLine.debit).label('dr'),
+            func.sum(JournalEntryLine.credit).label('cr')
+        ).join(
+            JournalEntry
+        ).filter(
+            JournalEntry.company_id == self.company_id,
+            JournalEntry.status == "posted",
+            JournalEntry.entry_date >= start_date,
+            JournalEntry.entry_date <= end_date,
+            JournalEntry.deleted_at.is_(None)
+        ).group_by(JournalEntryLine.account_id).all()
+
+        activity_map = {str(row.account_id): {"dr": row.dr or 0, "cr": row.cr or 0} for row in period_activity}
 
         revenue_accounts = []
         expense_accounts = []
 
-        for account in tb["accounts"]:
-            if account["account_type"] == "revenue":
-                revenue_accounts.append(account)
-            elif account["account_type"] == "expense":
-                expense_accounts.append(account)
+        total_revenue = Decimal('0.00')
+        total_expenses = Decimal('0.00')
 
-        total_revenue = sum(
-            Decimal(str(acc["credit"])) for acc in revenue_accounts
-        )
+        for account in accounts:
+            if account.account_type not in ("revenue", "expense"):
+                continue
 
-        total_expenses = sum(
-            Decimal(str(acc["debit"])) for acc in expense_accounts
-        )
+            activity = activity_map.get(str(account.id), {"dr": 0, "cr": 0})
+            dr = Decimal(str(activity["dr"]))
+            cr = Decimal(str(activity["cr"]))
+
+            if dr == 0 and cr == 0:
+                continue
+
+            if account.normal_balance == "debit":
+                balance = dr - cr
+            else:
+                balance = cr - dr
+
+            if balance >= 0:
+                if account.normal_balance == "debit":
+                    debit = balance
+                    credit = Decimal("0.00")
+                else:
+                    debit = Decimal("0.00")
+                    credit = balance
+            else:
+                if account.normal_balance == "debit":
+                    debit = Decimal("0.00")
+                    credit = abs(balance)
+                else:
+                    debit = abs(balance)
+                    credit = Decimal("0.00")
+
+            acc_data = {
+                "account_id": str(account.id),
+                "account_code": account.account_code,
+                "account_name": account.account_name,
+                "account_type": account.account_type,
+                "balance": float(balance),
+                "debit": float(debit),
+                "credit": float(credit)
+            }
+
+            if account.account_type == "revenue":
+                revenue_accounts.append(acc_data)
+                total_revenue += balance if account.normal_balance == "credit" else -balance
+            elif account.account_type == "expense":
+                expense_accounts.append(acc_data)
+                total_expenses += balance if account.normal_balance == "debit" else -balance
 
         net_income = total_revenue - total_expenses
 
@@ -58,7 +112,6 @@ class IncomeStatementService:
             "net_income": float(net_income),
             "is_profitable": net_income >= 0
         }
-
 
     def generate_comparative_income_statement(
         self,

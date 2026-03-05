@@ -210,7 +210,8 @@ async def approve_classification(
     transaction_id: str,
     request: Request,
     current_user: User = Depends(require_permission("approve_transactions")),
-    service: TransactionService = Depends(get_transaction_service)
+    service: TransactionService = Depends(get_transaction_service),
+    db: Session = Depends(get_db)
 ):
     """Approve the AI classification"""
 
