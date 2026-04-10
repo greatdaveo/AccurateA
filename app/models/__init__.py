@@ -19,6 +19,9 @@ from app.models.document import Document
 from app.models.fiscal_period import FiscalPeriod
 from app.models.open_banking_connection import OpenBankingConnection
 from app.models.bank_rule import BankRule
+from app.models.customer import Customer
+from app.models.invoice import Invoice, InvoiceLineItem
+
 
 
 #Export all models
@@ -46,6 +49,9 @@ __all__ = [
     "Document",
     "FiscalPeriod",
     "OpenBankingConnection",
-    "BankRule"
+    "BankRule",
+    "Customer",
+    "Invoice",
+    "InvoicelineItem"
 ]
 
