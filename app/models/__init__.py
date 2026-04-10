@@ -21,7 +21,8 @@ from app.models.open_banking_connection import OpenBankingConnection
 from app.models.bank_rule import BankRule
 from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceLineItem
-
+from app.models.supplier import Supplier
+from app.models.bill import Bill, BillLineItem
 
 
 #Export all models
@@ -52,6 +53,9 @@ __all__ = [
     "BankRule",
     "Customer",
     "Invoice",
-    "InvoicelineItem"
+    "InvoicelineItem",
+    "Supplier",
+    "Bill",
+    "BillLineItem"
 ]
 

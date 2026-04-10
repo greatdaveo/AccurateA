@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, UUID4
 
 from app.utils.database import get_db
 from app.api.auth import get_current_user
@@ -15,7 +15,7 @@ router = APIRouter(
 )
 
 class AccountResponse(BaseModel):
-    id: str
+    id: UUID4
     account_code: str
     account_name: str
     account_type: str

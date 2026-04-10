@@ -34,7 +34,8 @@ from app.api import (
     bank_rules,
     onboarding,
     adjustments,
-    invoices
+    invoices,
+    bills
 )
 from app.services.scheduler_service import scheduler
 from app.middleware.sentry_middleware import SentryUserMiddleware
@@ -138,6 +139,7 @@ app.include_router(bank_rules.router)
 app.include_router(onboarding.router)
 app.include_router(adjustments.router)
 app.include_router(invoices.router)
+app.include_router(bills.router)
 
 # To serve local uploads in dev
 import os
